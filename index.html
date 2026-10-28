@@ -1,0 +1,3311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Open Your Eyes</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=UnifrakturMaguntia&family=IM+Fell+English:ital@0;1&family=IM+Fell+English+SC&display=swap">
+<style>
+/* Layout: one fixed screen. #stage holds the scene layers (cables.gl house, line-art graveyard, shadow figure, fog);
+   #world adds eyelids, black-outs and game text and can shake as a whole. The old-film layer, the white flash and the loader sit above. */
+:root{
+  --ink:#0b0a09;        /* projector black, faintly warm */
+  --bone:#eee8da;       /* silver-print white */
+  --ash:#9a9385;
+  --flash:#fffdf7;
+  --dawn:#f3e6cf;       /* the real world, warm and in colour */
+  --dawn-ink:#3a2c1e;
+  --f-goth:"UnifrakturMaguntia","Old English Text MT","Goudy Text MT",serif;
+  --f-fell:"IM Fell English","Iowan Old Style",Georgia,serif;
+  --f-sc:"IM Fell English SC","IM Fell English",Georgia,serif;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0;background:var(--ink);color:var(--bone);overflow:hidden;
+  font-family:var(--f-fell);-webkit-font-smoothing:antialiased;-webkit-tap-highlight-color:transparent}
+button{font:inherit;color:inherit}
+
+/* ---------- world / stage ---------- */
+#world{position:fixed;inset:0;z-index:1;will-change:transform}
+#stage{position:absolute;inset:0;z-index:1;overflow:hidden;transform-origin:50% 50%;will-change:transform;background:#000}
+#vViscera{position:absolute;top:0;left:-300vw;width:100%;height:100%;border:0;pointer-events:none;background:var(--ink);z-index:1;opacity:0}
+#vViscera.here{left:0}
+/* the cables.gl scene is rendered larger than the screen so the "camera" can pan across it */
+#bgWrap{position:absolute;inset:0;z-index:2;transform-origin:40% 58%;will-change:transform,opacity}
+#vHouse{position:absolute;left:-12vw;top:-8vh;width:124vw;height:116vh;border:0;pointer-events:none;background:#000;transform-origin:0 0;image-rendering:pixelated}
+#yard,#fog{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+#yard{z-index:3;image-rendering:pixelated}
+#fog{z-index:5}
+#eyes{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:4;image-rendering:pixelated}
+/* inside: eyes grown into the walls, drawn over the Sketchfab scene */
+#wallEyes{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:6}
+/* a warped still of the guts, and the things drawn into the room: carving, photo, roots */
+#warp{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:5}
+#worldFx{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:7}
+/* the photo you wake up next to */
+#keepsake{position:absolute;z-index:3;top:9vh;right:7vw;width:min(34vw,12rem);height:auto;opacity:0;transform:translateY(-24px) rotate(11deg);
+  transition:opacity 1.8s ease,transform 1.8s cubic-bezier(.2,.8,.2,1);box-shadow:0 14px 36px rgba(60,40,20,.45)}
+#keepsake.in{opacity:1;transform:rotate(7deg)}
+
+
+/* the real world: morning light through blinds */
+#real{position:absolute;inset:0;z-index:2;overflow:hidden;filter:blur(14px);transition:filter 4.5s ease;
+  background:radial-gradient(ellipse 80% 70% at 72% 28%, #fff8ea 0%, var(--dawn) 42%, #d9bf9a 78%, #b89a74 100%)}
+#real.focus{filter:blur(0)}
+#real::before{content:"";position:absolute;right:-8%;top:-12%;width:70%;height:95%;transform:rotate(-14deg) skewX(-10deg);filter:blur(5px);opacity:.75;
+  background:repeating-linear-gradient(180deg, rgba(255,252,240,.95) 0 26px, rgba(255,252,240,0) 26px 44px);
+  -webkit-mask-image:linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);mask-image:linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent)}
+#real::after{content:"";position:absolute;inset:0;background:radial-gradient(ellipse 120% 90% at 50% 50%, transparent 55%, rgba(90,60,30,.35) 100%)}
+
+
+#lids{position:absolute;inset:0;pointer-events:none;z-index:6;overflow:hidden}
+.lid{position:absolute;left:-15%;width:130%;height:62%;background:#000;filter:blur(22px)}
+.lid.top{top:0;border-radius:0 0 50% 50% / 0 0 38% 38%;transform:translateY(-110%)}
+.lid.bottom{bottom:0;border-radius:50% 50% 0 0 / 38% 38% 0 0;transform:translateY(110%)}
+
+#black{position:absolute;inset:-6%;z-index:7;background:#000;opacity:0;pointer-events:none}
+
+/* ---------- old film layer ---------- */
+#grain,#dust{position:fixed;inset:0;width:100%;height:100%;pointer-events:none;transition:opacity 3s ease}
+#grain{z-index:10;opacity:.07}
+#dust{z-index:11;opacity:.5}
+#vignette{position:fixed;inset:0;z-index:12;pointer-events:none;transition:opacity 3s ease;
+  background:radial-gradient(ellipse 75% 70% at 50% 48%, transparent 52%, rgba(0,0,0,.55) 82%, rgba(0,0,0,.9) 100%)}
+#gate{position:fixed;inset:1.1vmin;z-index:13;pointer-events:none;border-radius:2.6vmin;transition:opacity 3s ease;
+  box-shadow:0 0 0 4vmin #050404, inset 0 0 5vmin 1vmin rgba(0,0,0,.85)}
+#flicker{position:fixed;inset:0;z-index:14;pointer-events:none;background:#000;opacity:0}
+body.real #grain,body.real #dust,body.real #vignette,body.real #gate{opacity:0}
+
+/* ---------- game text ---------- */
+#ui{position:absolute;inset:0;z-index:8;pointer-events:none;
+  padding:env(safe-area-inset-top,0px) max(16px,env(safe-area-inset-right,0px)) env(safe-area-inset-bottom,0px) max(16px,env(safe-area-inset-left,0px))}
+#ui section{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+
+#title{justify-content:center;gap:1.6rem;text-align:center;
+  background:radial-gradient(ellipse 62% 36% at 50% 50%, rgba(0,0,0,.72), rgba(0,0,0,.35) 60%, transparent 100%)}
+#title::before{content:"";position:absolute;left:50%;top:50%;width:min(80vw,62rem);height:min(30vw,16rem);transform:translate(-50%,-58%);
+  border-radius:50%;background:radial-gradient(ellipse at center, rgba(255,246,222,.22), rgba(255,240,210,.07) 45%, transparent 70%);
+  filter:blur(18px);opacity:0;transition:opacity 2.5s ease 1.4s;pointer-events:none}
+#title.ready::before{opacity:1;animation:halo 3.6s ease-in-out 3.8s infinite alternate}
+@keyframes halo{from{opacity:.65;transform:translate(-50%,-58%) scale(.96)}to{opacity:1;transform:translate(-50%,-58%) scale(1.05)}}
+#wake{position:relative;pointer-events:auto;cursor:pointer;background:none;border:0;padding:.1em .3em;
+  font-family:var(--f-goth);font-weight:400;font-size:clamp(3.2rem,11vw,9.5rem);line-height:1;color:#fffbf1;letter-spacing:.01em;text-wrap:balance;
+  text-shadow:0 0 .04em #fff,0 0 .12em rgba(255,250,232,.95),0 0 .3em rgba(255,240,208,.65),0 0 .7em rgba(255,232,192,.42),0 0 1.5em rgba(255,226,180,.26)}
+#wake.dip{opacity:.62}
+#wake .ch{display:inline-block;opacity:0;filter:blur(8px);transform:translateY(.12em)}
+#wake.in .ch{animation:inkIn 1.6s cubic-bezier(.2,.7,.2,1) forwards}
+@keyframes inkIn{to{opacity:1;filter:blur(0);transform:none}}
+#wake:hover,#wake:focus-visible{color:#fff}
+#wake:focus-visible{outline:1px solid rgba(238,232,218,.6);outline-offset:.25em}
+#wake.leaving .ch{animation:inkOut .7s ease-in forwards !important}
+@keyframes inkOut{from{opacity:1}to{opacity:0;filter:blur(14px);transform:translateY(-.15em) scale(1.25)}}
+.hint{margin:0;font-family:var(--f-sc);font-size:clamp(.8rem,1.8vw,1rem);letter-spacing:.32em;color:var(--bone);text-shadow:0 1px 6px #000;
+  opacity:0;transition:opacity 2s ease 2s}
+#title.ready .hint{opacity:.62}
+#title.gone .hint{opacity:0;transition:opacity .4s}
+
+#dialog{justify-content:flex-end;gap:clamp(1.4rem,4vh,2.4rem);padding-bottom:max(9vh,calc(env(safe-area-inset-bottom,0px) + 4.5rem));
+  background:linear-gradient(to top, rgba(0,0,0,.72) 0%, rgba(0,0,0,.35) 30%, transparent 55%);transition:opacity .9s ease}
+#dialog.dim{opacity:0}
+#dialog.center{justify-content:center;padding-bottom:0;background:none}
+#dialog.light{background:none}
+#line{margin:0;min-height:1.2em;max-width:min(92vw,58rem);font-family:var(--f-fell);font-style:italic;font-size:clamp(2rem,6.4vw,4.2rem);
+  line-height:1.15;text-align:center;color:var(--bone);text-shadow:0 .06em .5em rgba(0,0,0,.9);text-wrap:balance;transition:opacity .8s ease}
+#line.out{opacity:0}
+#line .ch{display:inline-block;white-space:pre;animation:tremble .16s steps(2,end) infinite}
+#line.shout{font-size:clamp(1.9rem,6vw,4rem);font-style:normal;letter-spacing:.01em;text-shadow:0 0 .3em rgba(0,0,0,.95),0 .06em .5em #000}
+#line.shout .ch{animation-duration:.08s}
+#line.voice{font-family:var(--f-goth);font-style:normal;font-size:clamp(2.2rem,7vw,5rem);line-height:1.1;color:#fffbf1;
+  text-shadow:0 0 .1em rgba(255,250,232,.85),0 0 .4em rgba(255,236,200,.45),0 0 1.1em rgba(255,226,180,.25)}
+#line.thought{font-size:clamp(1.5rem,4.4vw,2.8rem);color:#d8d1c2}
+#line.thought .ch,#line.real .ch{animation:none}
+#line.real{font-size:clamp(1.5rem,4.6vw,2.8rem);color:var(--dawn-ink);text-shadow:none}
+#line.inner{font-size:clamp(1.4rem,4vw,2.4rem);color:#d8d1c2}
+#line.inner .ch{animation:none}
+/* a clue held up close: the headstone or the door plate */
+#inspect{justify-content:center;padding-top:5vh;padding-bottom:24vh;opacity:0;transition:opacity .9s ease;
+  background:radial-gradient(ellipse 70% 60% at 50% 42%, rgba(0,0,0,.6), rgba(0,0,0,.9))}
+#inspect.show{opacity:1}
+#inspect svg{width:min(88vw,30rem);height:auto;max-height:60vh;display:block;filter:drop-shadow(0 0 12px rgba(236,232,220,.14))}
+#inspect .snap{display:block;width:min(70vw,20rem);height:auto;max-height:60vh;object-fit:contain;transform:rotate(-3deg);
+  box-shadow:0 18px 50px rgba(0,0,0,.75),0 0 0 1px rgba(255,255,255,.05)}
+#inspect .glint{animation:glint 3.4s ease-in-out infinite}
+@keyframes glint{0%,62%,100%{opacity:0}72%,86%{opacity:1}}
+/* your heart, on a monitor */
+#ecg{position:absolute;left:50%;top:calc(env(safe-area-inset-top,0px) + 1.2rem);width:240px;height:56px;transform:translateX(-50%);opacity:0;transition:opacity 1.2s ease}
+#ecg.show{opacity:.9}
+#inspect::after{content:"";position:absolute;inset:0;pointer-events:none;background:repeating-linear-gradient(0deg, rgba(0,0,0,.26) 0 2.6px, transparent 2.6px 5.36px)}
+@keyframes tremble{
+  0%{transform:translate(0,0) rotate(0)}
+  50%{transform:translate(var(--jx,.03em),var(--jy,-.03em)) rotate(var(--jr,.6deg))}
+}
+#choices{width:100%;display:flex;flex-wrap:wrap;justify-content:center;gap:1rem 1.4rem}
+.choice{pointer-events:auto;cursor:pointer;font-family:var(--f-sc);font-size:clamp(1.05rem,2.6vw,1.4rem);letter-spacing:.1em;
+  color:var(--bone);background:rgba(10,9,8,.82);border:1px solid rgba(238,232,218,.6);
+  outline:1px solid rgba(238,232,218,.22);outline-offset:5px;padding:.8em 1.7em;min-width:min(100%,15rem);
+  opacity:0;transform:translateY(.6rem);transition:background .25s,color .25s,outline-color .25s}
+.choice.show{animation:cardIn .9s cubic-bezier(.2,.8,.2,1) forwards}
+@keyframes cardIn{to{opacity:1;transform:none}}
+.choice:hover{background:var(--bone);color:var(--ink);outline-color:rgba(238,232,218,.6)}
+.choice:focus-visible{outline:2px solid var(--bone);outline-offset:6px}
+.choice:disabled{cursor:default}
+
+#end{justify-content:center;gap:1.6rem;text-align:center;opacity:0;transition:opacity 2.4s ease}
+#end.show{opacity:1}
+#end h2{margin:0;font-weight:400;line-height:1.05;text-wrap:balance}
+#end.good h2{font-family:var(--f-sc);font-size:clamp(2.4rem,8vw,5.5rem);letter-spacing:.32em;padding-left:.32em;color:var(--dawn-ink)}
+#end.good p{margin:0;font-style:italic;font-size:clamp(1rem,2.4vw,1.25rem);color:#6b5640}
+#end.tbc{justify-content:flex-end;padding-bottom:max(8vh,calc(env(safe-area-inset-bottom,0px) + 4.5rem));background:linear-gradient(to top, rgba(0,0,0,.7), transparent 40%)}
+#end.tbc h2{font-family:var(--f-goth);font-size:clamp(2rem,6vw,3.6rem);color:#fffbf1;text-shadow:0 0 .3em rgba(255,236,200,.35)}
+#end.open{background:#000}
+#end.open h2{font-family:var(--f-goth);font-size:clamp(2.6rem,9vw,6rem);color:#fffbf1;
+  text-shadow:0 0 .1em rgba(255,250,232,.85),0 0 .4em rgba(255,236,200,.45),0 0 1.1em rgba(255,226,180,.25);animation:endGlow 4s ease-in-out infinite alternate}
+#end.open p{margin:0;font-family:var(--f-fell);font-style:italic;font-size:clamp(1rem,2.6vw,1.35rem);color:#b9b2a3;max-width:30rem;opacity:0;animation:cardIn 2s ease 2.6s forwards}
+#end.open #restart{opacity:0;animation:cardIn 1.6s ease 4.2s forwards}
+@keyframes endGlow{from{opacity:.78}to{opacity:1}}
+#end.fail h2{font-family:var(--f-fell);font-style:italic;font-size:clamp(1.3rem,3.4vw,2rem);max-width:34rem;line-height:1.35}
+#restart{pointer-events:auto;cursor:pointer;background:none;border:1px solid currentColor;padding:.7em 1.6em;
+  font-family:var(--f-sc);letter-spacing:.14em;font-size:1rem;color:var(--bone)}
+#end.good #restart{color:var(--dawn-ink)}
+#restart:hover,#restart:focus-visible{background:var(--bone);color:var(--ink)}
+#end.good #restart:hover,#end.good #restart:focus-visible{background:var(--dawn-ink);color:var(--dawn)}
+
+/* ---------- flash, loader, chrome ---------- */
+#flash{position:fixed;inset:0;z-index:40;background:var(--flash);opacity:0;pointer-events:none}
+#loader{position:fixed;inset:0;z-index:50;background:#000;overflow:hidden;transition:opacity 1.6s ease}
+#loader.gone{opacity:0;pointer-events:none}
+#slit{position:absolute;left:-10%;right:-10%;top:50%;height:64vh;margin-top:-32vh;opacity:0;transform:scaleY(.02);filter:blur(16px);
+  background:radial-gradient(ellipse 50% 50% at 50% 50%, rgba(255,251,240,.95) 0%, rgba(255,248,232,.45) 34%, rgba(255,245,225,0) 70%)}
+#haze{position:absolute;inset:0;background:#fffbf2;opacity:0}
+#loadText{position:absolute;left:0;right:0;bottom:calc(env(safe-area-inset-bottom,0px) + 12vh);margin:0;padding-inline:16px;text-align:center;
+  font-family:var(--f-sc);letter-spacing:.3em;font-size:.85rem;color:#5d584f}
+#loadText.err{font-family:var(--f-fell);letter-spacing:0;font-size:1rem;color:var(--bone);bottom:auto;top:50%;transform:translateY(-50%);line-height:1.5}
+
+#sound{position:fixed;z-index:60;left:calc(max(16px,env(safe-area-inset-left,0px)) + .4rem);bottom:calc(env(safe-area-inset-bottom,0px) + 1rem);
+  display:flex;align-items:center;gap:.45rem;background:none;border:0;cursor:pointer;padding:.4rem;
+  font-family:var(--f-sc);font-size:.8rem;letter-spacing:.18em;color:var(--ash);opacity:.7}
+#sound:hover,#sound:focus-visible{opacity:1;color:var(--bone)}
+#sound svg{width:1.1rem;height:1.1rem}
+#credits{position:fixed;z-index:60;right:calc(max(16px,env(safe-area-inset-right,0px)) + .4rem);bottom:calc(env(safe-area-inset-bottom,0px) + 1.1rem);
+  margin:0;max-width:62vw;text-align:right;font-family:var(--f-fell);font-style:italic;font-size:.72rem;line-height:1.4;color:var(--ash);opacity:.6}
+#credits a{color:inherit}
+#credits a:hover{color:var(--bone)}
+body.real #sound,body.real #credits{color:#7a6650}
+@media (max-width:560px){#credits{display:none}}
+
+@media (prefers-reduced-motion:reduce){
+  #line .ch{animation:none}
+  #wake .ch{filter:none}
+  #title.ready::before{animation:none}
+}
+</style>
+</head>
+<body>
+
+<div id="world">
+  <div id="stage">
+    <iframe id="vViscera" title="Sublime Viscera scene" allow="autoplay; fullscreen; xr-spatial-tracking"></iframe>
+    <canvas id="warp" hidden aria-hidden="true"></canvas>
+    <canvas id="wallEyes" aria-hidden="true"></canvas>
+    <canvas id="worldFx" hidden aria-hidden="true"></canvas>
+    <div id="bgWrap"><iframe id="vHouse" title="Haunted house (cables.gl)" allow="autoplay" tabindex="-1"></iframe></div>
+    <canvas id="yard" aria-hidden="true"></canvas>
+    <canvas id="eyes" aria-hidden="true"></canvas>
+    <canvas id="fog" aria-hidden="true"></canvas>
+  </div>
+
+  <div id="real" hidden aria-hidden="true"></div>
+  <img id="keepsake" hidden alt="An instant photo of the round room with the man hanging upside down above the mound. Handwritten underneath: find the truth.">
+
+  <div id="lids" aria-hidden="true"><div class="lid top"></div><div class="lid bottom"></div></div>
+  <div id="black" aria-hidden="true"></div>
+
+  <main id="ui">
+    <section id="title" hidden>
+      <button id="wake" type="button" aria-label="Open your eyes"></button>
+      <p class="hint">click to wake</p>
+    </section>
+
+    <section id="inspect" hidden></section>
+
+    <section id="dialog" hidden>
+      <p id="line" aria-live="polite"></p>
+      <div id="choices"></div>
+    </section>
+
+    <section id="end" hidden></section>
+    <canvas id="ecg" hidden aria-hidden="true"></canvas>
+  </main>
+</div>
+
+<canvas id="grain" aria-hidden="true"></canvas>
+<canvas id="dust" aria-hidden="true"></canvas>
+<div id="vignette" aria-hidden="true"></div>
+<div id="gate" aria-hidden="true"></div>
+<div id="flicker" aria-hidden="true"></div>
+
+<div id="flash" aria-hidden="true"></div>
+
+<div id="loader" role="status">
+  <div id="slit"></div>
+  <div id="haze"></div>
+  <p id="loadText">Loading</p>
+</div>
+
+<button id="sound" type="button" aria-pressed="true">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path class="w" d="M15.5 9a4.2 4.2 0 0 1 0 6"/><path class="w" d="M18 6.5a7.6 7.6 0 0 1 0 11"/>
+  </svg>
+  <span>Sound on</span>
+</button>
+
+<p id="credits">
+  <a href="https://cables.gl/p/CmRmF0" target="_blank" rel="noopener">haunted house</a> by nickypy (cables.gl) ·
+  <a href="https://sketchfab.com/3d-models/ravencrest-manor-haunted-house-d4dbd3d3911c4920b600056b962a3085" target="_blank" rel="noopener">Ravencrest Manor</a> by Brian Trepanier ·
+  <a href="https://sketchfab.com/3d-models/sublime-viscera-visual-immersion-scene-a2f1e0b9be644aa0958548762596748c" target="_blank" rel="noopener">Sublime Viscera</a> by kingklaus · CC BY
+</p>
+
+<script>
+(() => {
+"use strict";
+
+/* ============================================================
+   CONFIG
+   The house scene is the cables.gl patch, shown through its official embed.
+   Its camera can't be steered from outside, so "where you stand" is a virtual
+   view {x, z, yaw, h, pitch}: the patch is panned and zoomed, and the graveyard
+   and fog layers are drawn in perspective from the same view.
+   x = sideways (m), z = towards the house (m), yaw 0 = facing the house, + = turning right.
+   ============================================================ */
+const CABLES_URL     = "https://cables.gl/view/CmRmF0";
+const CABLES_SETTLE  = 6500;   // the patch loads a 24 MB model after its page loads
+const VISCERA_UID    = "a2f1e0b9be644aa0958548762596748c";
+const VISCERA_CAM    = { p: [0, -6.6, 3.1], t: [0, 0, 2.4], fov: 62 };
+const WAKE_MS        = 9500;
+
+const WAKE_SPOT = { x: 0, z: 0, yaw: 0, h: 1.6, pitch: 0, zoom: 0 };
+const DOOR = { x: 0, z: 66, yaw: 0, h: 1.6, pitch: 0, zoom: 0.45 };
+
+const REDUCED = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const $ = s => document.querySelector(s);
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+const clamp01 = x => Math.max(0, Math.min(1, x));
+const smooth = (a, b, x) => { const t = clamp01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+const withTimeout = (p, ms) => Promise.race([p, new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), ms))]);
+const rand = (a, b) => a + Math.random() * (b - a);
+
+const els = {
+  world: $("#world"), stage: $("#stage"), bgWrap: $("#bgWrap"), vHouse: $("#vHouse"), vViscera: $("#vViscera"),
+  yard: $("#yard"), fog: $("#fog"), wallEyes: $("#wallEyes"), warp: $("#warp"), worldFx: $("#worldFx"), ecg: $("#ecg"), keepsake: $("#keepsake"), real: $("#real"), eyes: $("#eyes"), inspect: $("#inspect"),
+  lidTop: $(".lid.top"), lidBot: $(".lid.bottom"), black: $("#black"),
+  grain: $("#grain"), dust: $("#dust"), flicker: $("#flicker"),
+  title: $("#title"), wake: $("#wake"), dialog: $("#dialog"), line: $("#line"), choices: $("#choices"), end: $("#end"),
+  flash: $("#flash"), loader: $("#loader"), slit: $("#slit"), haze: $("#haze"), loadText: $("#loadText"),
+  sound: $("#sound")
+};
+
+let visceraApi = null, visceraP = null, visceraProgress = 0;
+
+/* ============================================================
+   VIEW — the virtual camera, with tweens
+   ============================================================ */
+const EASE = {
+  linear: p => p, in: p => p * p, out: p => 1 - (1 - p) * (1 - p),
+  inOut: p => p < 0.5 ? 2 * p * p : 1 - Math.pow(-2 * p + 2, 2) / 2,
+  outCubic: p => 1 - Math.pow(1 - p, 3)
+};
+const View = {
+  x: 0, z: 0, yaw: 0, h: 1.6, pitch: 0, zoom: 0, bgFade: 1, drift: false,
+  tweens: [],
+  to(target, sec, ease = "inOut") {
+    return new Promise(resolve => {
+      this.tweens = this.tweens.filter(t => {
+        for (const k in target) if (k in t.to) { t.resolve(); return false; }
+        return true;
+      });
+      if (!(sec > 0)) { Object.assign(this, target); resolve(); return; }
+      const from = {}; for (const k in target) from[k] = this[k];
+      this.tweens.push({ from, to: target, start: performance.now(), dur: sec * 1000, ease: EASE[ease] || EASE.inOut, resolve });
+      setTimeout(resolve, sec * 1000 + 50);   // keeps the story moving even if frames are throttled
+    });
+  },
+  step(now) {
+    this.tweens = this.tweens.filter(t => {
+      const p = clamp01((now - t.start) / t.dur), e = t.ease(p);
+      for (const k in t.to) this[k] = t.from[k] + (t.to[k] - t.from[k]) * e;
+      if (p >= 1) { t.resolve(); return false; }
+      return true;
+    });
+  }
+};
+
+/* ============================================================
+   THE CABLES.GL HOUSE (background)
+   ============================================================ */
+/* Performance: the patch renders every pixel of its frame several times (edge detection, noise, dither),
+   at up to 2x pixel density. It is rendered at a reduced size and blown up; the pixel budget below keeps it
+   smooth on most machines, and qLevel lowers it further if the frame rate drops. */
+const PIXEL_BUDGET = 2.2e6;
+let qLevel = 0, mosaicBlock = 1, houseDiv = 0, bgHideUntil = 0;
+function houseScale() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const px = innerWidth * 1.24 * innerHeight * 1.16 * dpr * dpr;
+  return Math.max(0.28, Math.min(1, Math.sqrt(PIXEL_BUDGET / px)) * Math.pow(0.8, qLevel));
+}
+const fogDiv = () => 2 + qLevel;
+function applyHouseSize() {
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  const k = mosaicBlock <= 1 ? 1 : Math.max(2, Math.round(mosaicBlock * dpr));
+  const D = Math.round(Math.max(k, 1 / houseScale()) * 100) / 100;
+  if (D === houseDiv) return;
+  houseDiv = D;
+  // the patch needs a few frames to redraw at its new size; blank it meanwhile (reads as vision flickering)
+  bgHideUntil = performance.now() + 170;
+  const f = els.vHouse;
+  if (D <= 1.001) { f.style.width = f.style.height = f.style.transform = ""; }
+  else {
+    f.style.width = `calc(124vw / ${D})`; f.style.height = `calc(116vh / ${D})`;
+    f.style.transform = `scale(${D})`;
+  }
+}
+addEventListener("resize", () => applyHouseSize());
+function setMosaic(block) {                // block = size of a mosaic tile in CSS px, 1 = off
+  if (block === mosaicBlock) return;
+  mosaicBlock = block;
+  applyHouseSize();
+  Yard.setBlock(block); FogGL.setBlock(block); Eyes.setBlock(block);
+}
+let bgLast = "";
+function applyBackground() {
+  const W = innerWidth, H = innerHeight, f = H * 1.05;
+  const yw = Math.atan2(Math.sin(View.yaw), Math.cos(View.yaw));
+  const vis = performance.now() < bgHideUntil ? 0 : (1 - smooth(0.3, 0.95, Math.abs(yw))) * View.bgFade;
+  const panX = Math.max(-0.11 * W, Math.min(0.11 * W, -yw * f * 0.8 - View.x * 5));
+  const panY = -View.pitch * H * 0.9 + (1.6 - View.h) * H * 0.05;
+  const zoom = 1 + View.z * 0.011 + View.zoom;
+  const tf = `translate(${panX.toFixed(1)}px,${panY.toFixed(1)}px) scale(${zoom.toFixed(4)})`, op = vis.toFixed(3);
+  const key = tf + op;
+  if (key !== bgLast) { bgLast = key; els.bgWrap.style.transform = tf; els.bgWrap.style.opacity = op; }
+  return vis;
+}
+
+/* ============================================================
+   GRAVEYARD — line-art headstones, crosses, trees and fence in perspective,
+   drawn to match the patch's edge-detected look
+   ============================================================ */
+const Yard = (() => {
+  const c = els.yard, ctx = c.getContext("2d");
+  let visible = false, block = 1, scale = 1, W = 0, H = 0, lastKey = "";
+  let seed = 20261028;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+
+  const PATHS = [
+    [[0, 0], [6, 9], [13, 22], [9, 35], [-6, 40], [-15, 28], [-10, 44], [0, 58], [0, 66]],
+    [[0, 0], [0, 66]],                                  // the centre aisle up to the door
+    [[-15, 28], [-9, 39], [-4, 47], [0, 56], [0, 66]]   // the way you run
+  ];
+  const segDist = (px, pz, a, b) => {
+    const vx = b[0] - a[0], vz = b[1] - a[1];
+    const t = clamp01(((px - a[0]) * vx + (pz - a[1]) * vz) / (vx * vx + vz * vz));
+    return Math.hypot(a[0] + vx * t - px, a[1] + vz * t - pz);
+  };
+  const nearPath = (x, z) => {
+    let m = 1e9;
+    for (const P of PATHS) for (let i = 0; i < P.length - 1; i++) m = Math.min(m, segDist(x, z, P[i], P[i + 1]));
+    return m;
+  };
+
+  const objs = [];
+  // one headstone, larger than the rest, beside the path (the clue)
+  objs.push({ type: "slab", x: 15.5, z: 25.5, w: 1.25, h: 2.1, lean: 0.04, mark: 0.3, special: true });
+  let tries = 0;
+  while (objs.length < 150 && tries++ < 5000) {
+    const x = -27 + rnd() * 54, z = 3 + rnd() * 57;
+    if (nearPath(x, z) < 2.3) continue;
+    if (objs.some(o => Math.hypot(o.x - x, o.z - z) < 1.7)) continue;
+    const r = rnd(), type = r < 0.58 ? "slab" : r < 0.84 ? "cross" : "obelisk";
+    const w = type === "slab" ? 0.55 + rnd() * 0.4 : type === "cross" ? 0.55 + rnd() * 0.25 : 0.45 + rnd() * 0.25;
+    const h = type === "slab" ? 0.75 + rnd() * 0.6 : type === "cross" ? 1.1 + rnd() * 0.5 : 1.5 + rnd() * 0.8;
+    objs.push({ type, x, z, w, h, lean: (rnd() - 0.5) * 0.26, mark: rnd() });
+  }
+  function makeTree(h) {
+    const segs = [];
+    const br = (x, y, ang, len, w, d) => {
+      const x2 = x + Math.sin(ang) * len, y2 = y + Math.cos(ang) * len;
+      segs.push([x, y, x2, y2, w]);
+      if (d <= 0) return;
+      const n = 2 + (rnd() < 0.4 ? 1 : 0);
+      for (let i = 0; i < n; i++) br(x2, y2, ang + (rnd() - 0.5) * 1.1 + (i - (n - 1) / 2) * 0.62, len * (0.56 + rnd() * 0.18), w * 0.58, d - 1);
+    };
+    br(0, 0, (rnd() - 0.5) * 0.15, h * 0.42, h * 0.07, 3);
+    return segs;
+  }
+  [[-20, 10], [21, 8], [-25, 36], [24, 40], [-15, 55], [16, 56], [28, 22], [-29, 22]].forEach(([x, z]) => {
+    const h = 7 + rnd() * 4;
+    objs.push({ type: "tree", x, z, h, segs: makeTree(h) });
+  });
+  const fenceLines = [[], [], []];
+  for (let x = -30; x <= 30.01; x += 1.6) if (Math.abs(x) > 2.6) fenceLines[0].push([x, 63]);
+  for (let z = 0; z < 63; z += 1.6) { fenceLines[1].push([-31, z]); fenceLines[2].push([31, z]); }
+  fenceLines.forEach(line => {
+    line.forEach(([x, z]) => objs.push({ type: "post", x, z, h: 1.9 }));
+    for (let i = 0; i < line.length - 1; i++) {
+      const a = line[i], b = line[i + 1];
+      if (Math.hypot(a[0] - b[0], a[1] - b[1]) > 2) continue;   // the gate
+      objs.push({ type: "rail", x: (a[0] + b[0]) / 2, z: (a[1] + b[1]) / 2, a, b });
+    }
+  });
+  const tufts = [];
+  for (let i = 0; i < 220; i++) tufts.push({ x: -30 + rnd() * 60, z: 1 + rnd() * 62, s: 0.16 + rnd() * 0.2 });
+
+  function size() {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    scale = block > 1 ? 1 / block : Math.min(dpr, 1);   // thin line art reads fine at 1x and costs a quarter
+    const w = Math.max(1, Math.round(innerWidth * scale)), h = Math.max(1, Math.round(innerHeight * scale));
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+    W = innerWidth; H = innerHeight;
+  }
+  size(); addEventListener("resize", size);
+
+  const LINE = a => `rgba(238,233,220,${a})`;
+  function drawAll(v, ox, oy, alpha, T) {
+    const f = H * 1.05, hz = H * (0.8 - v.pitch);
+    if (alpha === 1) Giant.draw(ctx, v, W, H, f, hz);   // the giant is behind everything else
+    const cy = Math.cos(v.yaw), sy = Math.sin(v.yaw);
+    const proj = (x, z) => {
+      const dx = x - v.x, dz = z - v.z;
+      return [dx * cy - dz * sy, dx * sy + dz * cy];
+    };
+    // grass first, in one path; headstones drawn later cover it
+    ctx.globalAlpha = 0.4 * alpha; ctx.strokeStyle = LINE(1); ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (const t of tufts) {
+      const p = proj(t.x, t.z);
+      if (p[1] < 0.35 || p[1] > 45) continue;
+      const sx = W / 2 + p[0] / p[1] * f + ox;
+      if (sx < -20 || sx > W + 20) continue;
+      const gy = hz + v.h / p[1] * f + oy, k = t.s * f / p[1];
+      ctx.moveTo(sx, gy); ctx.lineTo(sx - k * 0.5, gy - k);
+      ctx.moveTo(sx, gy); ctx.lineTo(sx + k * 0.1, gy - k * 1.2);
+      ctx.moveTo(sx, gy); ctx.lineTo(sx + k * 0.55, gy - k * 0.85);
+    }
+    ctx.stroke();
+    const list = [];
+    for (const o of objs) {
+      if (o.type === "rail") {
+        const A = proj(o.a[0], o.a[1]), B = proj(o.b[0], o.b[1]);
+        if (A[1] < 0.35 || B[1] < 0.35) continue;
+        list.push({ o, rz: (A[1] + B[1]) / 2, A, B });
+      } else {
+        const p = proj(o.x, o.z);
+        if (p[1] < 0.35 || p[1] > 80) continue;
+        const sx = W / 2 + p[0] / p[1] * f;
+        if (sx < -W * 0.4 || sx > W * 1.4) continue;
+        list.push({ o, rz: p[1], sx });
+      }
+    }
+    list.sort((a, b) => b.rz - a.rz);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    for (const it of list) {
+      const o = it.o, rz = it.rz, s = f / rz;
+      const fade = Math.max(0.12, Math.min(1, 1.25 - rz / 55)) * alpha;
+      const gy = hz + v.h / rz * f + oy;
+      const lw = Math.max(0.8, Math.min(3, s * 0.022));
+      ctx.globalAlpha = fade;
+      if (o.type === "rail") {
+        const ax = W / 2 + it.A[0] / it.A[1] * f + ox, bx = W / 2 + it.B[0] / it.B[1] * f + ox;
+        const ay = hz + v.h / it.A[1] * f + oy, by = hz + v.h / it.B[1] * f + oy;
+        const sa = f / it.A[1], sb = f / it.B[1];
+        ctx.strokeStyle = LINE(0.8); ctx.lineWidth = lw * 0.8;
+        ctx.beginPath();
+        ctx.moveTo(ax, ay - 0.55 * sa); ctx.lineTo(bx, by - 0.55 * sb);
+        ctx.moveTo(ax, ay - 1.45 * sa); ctx.lineTo(bx, by - 1.45 * sb);
+        ctx.stroke();
+        continue;
+      }
+      const sx = it.sx + ox;
+      ctx.save();
+      ctx.translate(sx, gy);
+      if (o.lean) ctx.rotate(o.lean * 0.5);
+      ctx.fillStyle = "#040404"; ctx.strokeStyle = LINE(0.95); ctx.lineWidth = lw;
+      if (o.type === "tree") {
+        // pale outline first, dark core on top: reads as an edge
+        for (const pass of [0, 1]) {
+          ctx.strokeStyle = pass ? "#040404" : LINE(0.9);
+          for (const [x1, y1, x2, y2, w] of o.segs) {
+            const ww = w * s;
+            if (pass && ww < 1.6) continue;
+            ctx.lineWidth = pass ? ww : Math.max(0.8, ww + lw * 1.6);
+            ctx.beginPath(); ctx.moveTo(x1 * s, -y1 * s); ctx.lineTo(x2 * s, -y2 * s); ctx.stroke();
+          }
+        }
+      } else {
+        const w = o.w * s, h = o.h * s;
+        ctx.beginPath();
+        if (o.type === "slab") {
+          ctx.moveTo(-w / 2, 0); ctx.lineTo(-w / 2, -h + w / 2); ctx.arc(0, -h + w / 2, w / 2, Math.PI, 0); ctx.lineTo(w / 2, 0);
+        } else if (o.type === "cross") {
+          const vb = w * 0.22, t1 = -h * 0.6, t2 = -h * 0.8;
+          ctx.moveTo(-vb / 2, 0); ctx.lineTo(-vb / 2, t1); ctx.lineTo(-w / 2, t1); ctx.lineTo(-w / 2, t2); ctx.lineTo(-vb / 2, t2);
+          ctx.lineTo(-vb / 2, -h); ctx.lineTo(vb / 2, -h); ctx.lineTo(vb / 2, t2); ctx.lineTo(w / 2, t2); ctx.lineTo(w / 2, t1);
+          ctx.lineTo(vb / 2, t1); ctx.lineTo(vb / 2, 0);
+        } else if (o.type === "obelisk") {
+          ctx.moveTo(-w * 0.7, 0); ctx.lineTo(-w * 0.7, -h * 0.08); ctx.lineTo(-w / 2, -h * 0.08); ctx.lineTo(-w * 0.36, -h * 0.86);
+          ctx.lineTo(0, -h); ctx.lineTo(w * 0.36, -h * 0.86); ctx.lineTo(w / 2, -h * 0.08); ctx.lineTo(w * 0.7, -h * 0.08); ctx.lineTo(w * 0.7, 0);
+        } else if (o.type === "post") {
+          const pw = Math.max(1, 0.09 * s), hh = o.h * s;
+          ctx.moveTo(-pw / 2, 0); ctx.lineTo(-pw / 2, -hh); ctx.lineTo(0, -hh - 0.22 * s); ctx.lineTo(pw / 2, -hh); ctx.lineTo(pw / 2, 0);
+        }
+        ctx.closePath(); ctx.fill(); ctx.stroke();
+        if (o.special && s > 14) {               // the large headstone has an eye cut into it
+          ctx.globalAlpha = fade * 0.85; ctx.lineWidth = Math.max(0.8, lw * 0.8);
+          ctx.beginPath();
+          ctx.moveTo(-w * 0.28, -h * 0.72); ctx.quadraticCurveTo(0, -h * 0.85, w * 0.28, -h * 0.72); ctx.quadraticCurveTo(0, -h * 0.59, -w * 0.28, -h * 0.72);
+          ctx.stroke();
+          ctx.strokeStyle = "#d0161f";            // a red pupil
+          ctx.beginPath(); ctx.moveTo(0, -h * 0.79); ctx.lineTo(0, -h * 0.65); ctx.stroke();
+        } else if (o.type === "slab" && s > 26) {      // carving
+          ctx.globalAlpha = fade * 0.55; ctx.lineWidth = Math.max(0.7, lw * 0.7);
+          ctx.beginPath();
+          if (o.mark < 0.5) { ctx.moveTo(0, -h * 0.74); ctx.lineTo(0, -h * 0.4); ctx.moveTo(-w * 0.15, -h * 0.63); ctx.lineTo(w * 0.15, -h * 0.63); }
+          else { ctx.moveTo(-w * 0.26, -h * 0.55); ctx.lineTo(w * 0.26, -h * 0.55); ctx.moveTo(-w * 0.2, -h * 0.42); ctx.lineTo(w * 0.2, -h * 0.42); }
+          if (o.mark > 0.8) { ctx.moveTo(w * 0.1, -h * 0.9); ctx.lineTo(-w * 0.05, -h * 0.7); ctx.lineTo(w * 0.08, -h * 0.55); ctx.lineTo(-w * 0.02, -h * 0.3); }
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  return {
+    show(v) { visible = v; lastKey = ""; if (!v) { ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height); } },
+    setBlock(b) { block = b; size(); lastKey = ""; },
+    draw(v, split, T) {
+      if (!visible) return;
+      // only redraw when the view has moved (or double vision is wobbling)
+      const key = [v.x, v.z, v.yaw, v.h, v.pitch].map(n => n.toFixed(3)).join() + c.width;
+      const live = split > 0.01 || Giant.isOn();
+      if (key === lastKey && !live) return;
+      lastKey = live ? "" : key;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.clearRect(0, 0, c.width, c.height);
+      ctx.setTransform(scale, 0, 0, scale, 0, 0);
+      drawAll(v, 0, 0, 1, T);
+      if (split > 0.01) {                                  // double vision
+        const s = Math.min(1, split);
+        drawAll(v, s * (46 * Math.sin(T * 0.9) + 18), s * 14 * Math.sin(T * 1.3), 0.42 * s, T);
+      }
+      // interlace, like the patch
+      ctx.globalCompositeOperation = "destination-out";
+      ctx.fillStyle = "rgba(0,0,0,.32)";
+      for (let y = 0; y < H; y += 5.36) ctx.fillRect(0, y, W, 2.6);
+      ctx.globalCompositeOperation = "source-over";
+    }
+  };
+})();
+
+/* ============================================================
+   FOG — WebGL: drifting noise fog low over the ground, with pale contour
+   lines like the patch's edge-detected noise, dithered and interlaced
+   ============================================================ */
+const FogGL = (() => {
+  const c = els.fog;
+  const gl = c.getContext("webgl", { premultipliedAlpha: true, alpha: true, antialias: false });
+  if (!gl) return { target() {}, off() {}, setBlock() {}, resize() {}, draw() {} };
+  const deriv = gl.getExtension("OES_standard_derivatives");
+  const VS = "attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}";
+  const FS = (deriv ? "#extension GL_OES_standard_derivatives : enable\n#define HAS_D 1\n" : "") + `
+#ifdef GL_FRAGMENT_PRECISION_HIGH
+precision highp float;
+#else
+precision mediump float;
+#endif
+uniform vec2 uRes; uniform float uTime; uniform vec3 uCam; uniform float uDensity; uniform float uHorizon; uniform float uPix; uniform float uSky; uniform vec3 uTint;
+float hash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
+float noise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3. - 2. * f);
+  return mix(mix(hash(i), hash(i + vec2(1., 0.)), u.x), mix(hash(i + vec2(0., 1.)), hash(i + vec2(1., 1.)), u.x), u.y); }
+float fbm(vec2 p){ float v = 0., a = .5; for (int i = 0; i < 4; i++){ v += a * noise(p); p = p * 2.02 + vec2(13.1, 7.7); a *= .5; } return v + .03; }
+float bayer2(vec2 a){ a = floor(a); return fract(dot(a, vec2(.5, a.y * .75))); }
+float bayer4(vec2 a){ return bayer2(.5 * a) * .25 + bayer2(a); }
+float lineAt(float f, float level, float w){
+#ifdef HAS_D
+  float g = fwidth(f) * 1.4 + .004 * uPix;
+#else
+  float g = .012 + .004 * uPix;
+#endif
+  return 1. - smoothstep(0., g * w, abs(f - level));
+}
+void main(){
+  vec2 cell = floor(gl_FragCoord.xy / uPix);
+  vec2 uv = (cell + .5) * uPix / uRes;
+  float aspect = uRes.x / uRes.y;
+  float yt = 1. - uv.y;                 /* 0 top, 1 bottom */
+  float sx = (uv.x - .5) * aspect;
+  float yaw = uCam.z;
+  /* ground fog */
+  float top = uHorizon - .34;
+  float hm = smoothstep(top, top + .5, yt);
+  vec2 q1 = vec2(sx * 1.25 + yaw * 1.6 + uCam.x * .04 + uTime * .022, yt * 2.6 - uCam.y * .045);
+  vec2 q2 = vec2(sx * 2.4 + yaw * 2.4 + uCam.x * .07 - uTime * .035, yt * 4.4 - uCam.y * .08 + uTime * .01);
+  float w = fbm(q1 * 1.7 + uTime * .01);
+  float f = fbm(q1 + w * .6) * .62 + fbm(q2) * .48;
+  float dens = smoothstep(.36, .82, f) * hm * uDensity;
+  float contour = (lineAt(f, .64, 1.) * .55 + lineAt(f, .52, 1.) * .25) * hm * uDensity;
+  /* when the house is out of sight: outlined noise drifting in the sky, like the patch */
+  float sm = 1. - smoothstep(uHorizon - .12, uHorizon + .02, yt);
+  float d = bayer4(cell);
+  float sn = fbm(vec2(sx * 9. + yaw * 14. + uTime * .22, yt * 9. + uTime * .06));
+  float sky = (lineAt(sn, .63, 1.2) + step(.67, sn) * step(d, .35) * .7) * sm * uSky;
+  float soft = step(d + .06, dens) * .3 + dens * .42;   /* no stray dither dots where the fog is almost gone */
+  float a = clamp(soft + contour * .9 + sky * .85, 0., 1.);
+  a *= .8 + .2 * step(2.68, mod(gl_FragCoord.y / max(uPix, 1.) + uTime * 18., 5.36));
+  gl_FragColor = vec4(uTint * a, a);
+}`;
+  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s); if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) console.warn(gl.getShaderInfoLog(s)); return s; };
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { console.warn(gl.getProgramInfoLog(prog)); return { target() {}, off() {}, setBlock() {}, resize() {}, draw() {} }; }
+  gl.useProgram(prog);
+  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+  const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+  const U = {}; ["uRes", "uTime", "uCam", "uDensity", "uHorizon", "uPix", "uSky", "uTint"].forEach(n => U[n] = gl.getUniformLocation(prog, n));
+  let density = 0, target = 0, sky = 0, block = 1, drawn = false, lastDraw = 0;
+  function size() {
+    const w = Math.max(2, Math.round(innerWidth / fogDiv())), h = Math.max(2, Math.round(innerHeight / fogDiv()));
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; gl.viewport(0, 0, w, h); }
+  }
+  size(); addEventListener("resize", size);
+  let enabled = true;
+  return {
+    target(v) { target = v; },
+    off() { enabled = false; density = target = sky = 0; },
+    setBlock(b) { block = b; },
+    resize() { size(); },
+    draw(now, dt, v, bgVis) {
+      density += (target - density) * (1 - Math.exp(-dt * 0.8));
+      const skyT = enabled ? (1 - bgVis) * (density > 0.02 ? 1 : 0) : 0;
+      sky += (skyT - sky) * (1 - Math.exp(-dt * 2));
+      if (density < 0.004 && sky < 0.004) { if (drawn) { gl.clearColor(0, 0, 0, 0); gl.clear(gl.COLOR_BUFFER_BIT); drawn = false; } return; }
+      if (now - lastDraw < 30 && block <= 1) return;   // fog drifts slowly; 30 fps is plenty
+      lastDraw = now;
+      drawn = true;
+      gl.uniform2f(U.uRes, c.width, c.height);
+      gl.uniform1f(U.uTime, (now / 1000) % 1000);
+      gl.uniform3f(U.uCam, v.x, v.z, v.yaw);
+      gl.uniform1f(U.uDensity, density);
+      gl.uniform1f(U.uHorizon, 0.8 - v.pitch);
+      gl.uniform1f(U.uPix, Math.max(1, block / fogDiv()));
+      const deep = Giant.presence() * 0.8;
+      gl.uniform1f(U.uSky, sky * (1 - deep * 0.85));
+      gl.uniform3f(U.uTint, 0.94 + (0.42 - 0.94) * deep, 0.92 + (0.66 - 0.92) * deep, 0.87 + (0.95 - 0.87) * deep);
+      gl.drawArrays(gl.TRIANGLES, 0, 3);
+    }
+  };
+})();
+
+/* ============================================================
+   THE GIANT — a hunched, translucent thing on four impossibly long limbs.
+   World units are metres; its back is about 210 m above the ground.
+   Drawn into the graveyard canvas, in the same perspective.
+   ============================================================ */
+const Giant = (() => {
+  let on = false, alpha = 0, alphaT = 0, lastT = performance.now();
+  const B = { x: -30, z: -200 };                       // body centre, over the ground
+  const LIMBS = [
+    { s: -1, front: true }, { s: 1, front: false }, { s: 1, front: true }, { s: -1, front: false }
+  ];
+  const rest = (L, bz) => ({ x: B.x + L.s * (L.front ? 46 : 40), z: bz + (L.front ? 70 : -50) });
+  function place(x, z) {
+    B.x = x; B.z = z; anim = null;
+    LIMBS.forEach(L => { const r = rest(L, z); L.f = { x: r.x, y: 0, z: r.z }; });
+  }
+  let seed = 4242;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const strands = Array.from({ length: 34 }, () => ({ u: rnd(), v: rnd(), len: 40 + rnd() * 125, ph: rnd() * 6.28, sp: 0.3 + rnd() * 0.5, curl: (rnd() - 0.5) * 14 }));
+  const headEyes = [[-4.6, 0], [4.6, 0.8], [0.2, 6.5]].map(([dx, dy]) => ({ giant: true, dx, dy, x: 0, y: 0, z: 0, size: 5, open: 1 }));
+  let anim = null, next = 0, chain = Promise.resolve();
+  place(-30, -200);
+
+  function land(F) {
+    const d = Math.hypot(F.x - View.x, F.z - View.z);
+    const vol = clamp01(1.15 - d / 260);
+    Sound.giantStep(Math.max(0.12, vol));
+    FX.kick(0.2 + vol * 0.95);
+    Eyes.flinch();
+  }
+  function doStep(stride, dur) {
+    return new Promise(res => {
+      const L = LIMBS[next++ % 4];
+      const bodyTo = B.z + stride * 0.25, r = rest(L, bodyTo);
+      anim = { L, fx: L.f.x, fz: L.f.z, tx: r.x, tz: r.z + Math.min(stride * 0.3, 20), bodyFrom: B.z, bodyTo,
+               t0: performance.now(), dur: dur * 1000, lift: 34, res };
+    });
+  }
+  function update(now) {
+    const dt = Math.min(0.1, (now - lastT) / 1000); lastT = now;
+    alpha += (alphaT - alpha) * (1 - Math.exp(-dt * 1.6));
+    const a = anim;
+    if (!a) return;
+    const p = clamp01((now - a.t0) / a.dur);
+    if (a.drop) {
+      a.L.f.y = a.y0 * (1 - p * p);
+    } else {
+      const e = EASE.inOut(p);
+      a.L.f.x = a.fx + (a.tx - a.fx) * e; a.L.f.z = a.fz + (a.tz - a.fz) * e;
+      a.L.f.y = Math.sin(Math.PI * p) * a.lift;
+      B.z = a.bodyFrom + (a.bodyTo - a.bodyFrom) * e;
+    }
+    if (p >= 1) { a.L.f.y = 0; anim = null; land(a.L.f); a.res(); }
+  }
+
+  // drawing ---------------------------------------------------
+  const NEAR = 0.8;
+  let V, CW, F, HZ;
+  const camPt = (x, y, z) => {
+    const dx = x - V.x, dz = z - V.z, c = Math.cos(V.yaw), s = Math.sin(V.yaw);
+    return [dx * c - dz * s, y - V.h, dx * s + dz * c];
+  };
+  const scr = p => [CW / 2 + p[0] / p[2] * F, HZ - p[1] / p[2] * F];
+  const mix3 = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+  function seg(ctx, A, Bw, wa, wb) {          // a tapered limb segment, clipped at the near plane
+    let a = camPt(...A), b = camPt(...Bw);
+    if (a[2] < NEAR && b[2] < NEAR) return;
+    if (a[2] < NEAR) { const t = (NEAR - a[2]) / (b[2] - a[2]); a = mix3(a, b, t); wa += (wb - wa) * t; }
+    else if (b[2] < NEAR) { const t = (NEAR - b[2]) / (a[2] - b[2]); b = mix3(b, a, t); wb += (wa - wb) * t; }
+    const sa = scr(a), sb = scr(b), ra = wa / 2 * F / a[2], rb = wb / 2 * F / b[2];
+    let nx = -(sb[1] - sa[1]), ny = sb[0] - sa[0]; const nl = Math.hypot(nx, ny) || 1; nx /= nl; ny /= nl;
+    ctx.beginPath();
+    ctx.moveTo(sa[0] + nx * ra, sa[1] + ny * ra); ctx.lineTo(sb[0] + nx * rb, sb[1] + ny * rb);
+    ctx.lineTo(sb[0] - nx * rb, sb[1] - ny * rb); ctx.lineTo(sa[0] - nx * ra, sa[1] - ny * ra); ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(sa[0] + nx * ra, sa[1] + ny * ra); ctx.lineTo(sb[0] + nx * rb, sb[1] + ny * rb);
+    ctx.moveTo(sb[0] - nx * rb, sb[1] - ny * rb); ctx.lineTo(sa[0] - nx * ra, sa[1] - ny * ra);
+    ctx.stroke();
+    ctx.globalAlpha *= 0.45;                  // a faint sinew down the middle
+    ctx.beginPath(); ctx.moveTo(sa[0], sa[1]); ctx.lineTo(sb[0], sb[1]); ctx.stroke();
+    ctx.globalAlpha /= 0.45;
+    if (b[2] > NEAR + 0.01) { ctx.beginPath(); ctx.arc(sb[0], sb[1], rb, 0, Math.PI * 2); ctx.fill(); }
+  }
+  function line(ctx, A, Bw) {
+    let a = camPt(...A), b = camPt(...Bw);
+    if (a[2] < NEAR && b[2] < NEAR) return;
+    if (a[2] < NEAR) a = mix3(a, b, (NEAR - a[2]) / (b[2] - a[2]));
+    else if (b[2] < NEAR) b = mix3(b, a, (NEAR - b[2]) / (a[2] - b[2]));
+    const sa = scr(a), sb = scr(b);
+    ctx.moveTo(sa[0], sa[1]); ctx.lineTo(sb[0], sb[1]);
+  }
+  // deep-sea look: a near-black navy mass, a faint cold rim, glowing spots, drifting "marine snow"
+  const NAVY = "rgba(3,12,36,0.9)", RIM = "rgba(70,160,255,0.38)";
+  const lights = Array.from({ length: 44 }, (_, i) => ({ L: i % 4, t: rnd() * 2, side: (rnd() - 0.5) * 0.8, ph: rnd() * 6.28, sp: 0.6 + rnd() * 1.4 }));
+  const bodyLights = Array.from({ length: 26 }, () => ({ u: rnd(), v: rnd(), ph: rnd() * 6.28, sp: 0.5 + rnd() }));
+  const snow = Array.from({ length: 90 }, () => ({ x: (rnd() - 0.5) * 220, y: rnd() * 240, z: (rnd() - 0.4) * 220, s: 0.3 + rnd() * 0.7 }));
+  function joints(L, T, by) {
+    const S = [B.x + L.s * (L.front ? 20 : 18), (L.front ? 182 : 190) + by, B.z + (L.front ? 32 : -32)];
+    const Ft = [L.f.x, L.f.y, L.f.z];
+    const K = [(S[0] + Ft[0]) / 2 + L.s * (16 + Math.sin(T * 0.4 + L.s) * 3), (L.front ? 92 : 118) + Ft[1] * 0.5 + by * 0.5, (S[2] + Ft[2]) / 2 + (L.front ? 6 : -10)];
+    return [S, K, Ft];
+  }
+  function glow(ctx, P, size, a) {           // one bioluminescent spot
+    const c = camPt(...P);
+    if (c[2] < NEAR) return;
+    const q = scr(c), r = Math.max(0.8, Math.min(7, size * F / c[2]));
+    if (q[0] < -20 || q[0] > CW + 20 || q[1] < -20 || q[1] > HZ * 3) return;
+    ctx.fillStyle = `rgba(80,180,255,${(a * 0.16).toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(q[0], q[1], r * 3.2, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = `rgba(160,228,255,${(a * 0.9).toFixed(3)})`;
+    ctx.beginPath(); ctx.arc(q[0], q[1], r, 0, Math.PI * 2); ctx.fill();
+  }
+  function draw(ctx, v, W, H, f, hz) {
+    if (!on || alpha < 0.01) return;
+    V = v; CW = W; F = f; HZ = hz;
+    const T = performance.now() / 1000, by = Math.sin(T * 0.35) * 4;   // it floats a little, as if under water
+    ctx.save();
+    ctx.globalAlpha = Math.min(1, alpha);
+    ctx.lineJoin = "round"; ctx.lineCap = "round";
+    ctx.fillStyle = NAVY; ctx.strokeStyle = RIM; ctx.lineWidth = 1.1;
+    const J = LIMBS.map(L => joints(L, T, by));
+    LIMBS.forEach((L, i) => {
+      const [S, K, Ft] = J[i];
+      seg(ctx, S, K, L.front ? 16 : 21, L.front ? 9.5 : 12);
+      seg(ctx, K, Ft, L.front ? 9.5 : 12, L.front ? 5 : 6.5);
+      ctx.beginPath();                        // long fingers splayed on the ground
+      for (let k = -1.5; k <= 1.5; k++) line(ctx, Ft, [Ft[0] + k * 2.6 + L.s, Math.max(0, Ft[1] - 1), Ft[2] + 10 - Math.abs(k) * 1.5]);
+      ctx.stroke();
+    });
+    // the body, seen from below (convex outline of its underside), then faint ribs
+    const pts = [];
+    for (let k = 0; k <= 6; k++) for (let a = 0; a < 12; a++) {
+      const t = (k - 3) / 3, ang = a / 12 * Math.PI * 2;
+      const cp = camPt(B.x + Math.cos(ang) * (27 - t * t * 9), 194 + by + Math.sin(ang) * (23 - t * t * 7), B.z - 38 + k * 12.5);
+      if (cp[2] > NEAR) pts.push(scr(cp));
+    }
+    if (pts.length > 2) {
+      pts.sort((p1, p2) => p1[0] - p2[0] || p1[1] - p2[1]);
+      const cross = (o, a2, b2) => (a2[0] - o[0]) * (b2[1] - o[1]) - (a2[1] - o[1]) * (b2[0] - o[0]);
+      const lo = [], up = [];
+      for (const q of pts) { while (lo.length > 1 && cross(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+      for (let i = pts.length - 1; i >= 0; i--) { const q = pts[i]; while (up.length > 1 && cross(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+      const hull = lo.slice(0, -1).concat(up.slice(0, -1));
+      ctx.beginPath(); hull.forEach((q, i) => i ? ctx.lineTo(q[0], q[1]) : ctx.moveTo(q[0], q[1])); ctx.closePath();
+      ctx.fillStyle = NAVY; ctx.fill(); ctx.stroke();
+    }
+    ctx.strokeStyle = "rgba(70,160,255,0.16)";
+    for (let k = 0; k <= 8; k++) {
+      const t = (k - 4) / 4, c = camPt(B.x, 192 + by - Math.abs(t) * 6, B.z - 36 + k * 9);
+      if (c[2] < NEAR) continue;
+      const sc = scr(c), rx = (26 - t * t * 8) * F / c[2], ry = (21 - t * t * 6) * F / c[2];
+      ctx.beginPath(); ctx.ellipse(sc[0], sc[1], rx, ry, 0, 0.15, Math.PI - 0.15); ctx.stroke();
+    }
+    // the hanging head
+    const hc = camPt(B.x, 150 + by, B.z + 54);
+    if (hc[2] > NEAR) {
+      const sc = scr(hc);
+      ctx.fillStyle = NAVY; ctx.strokeStyle = RIM;
+      ctx.beginPath(); ctx.ellipse(sc[0], sc[1], 12 * F / hc[2], 17 * F / hc[2], 0, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+    }
+    // tendrils, drifting like something under water
+    ctx.strokeStyle = "rgba(24,70,150,0.55)"; ctx.lineWidth = 1;
+    const tips = [];
+    ctx.beginPath();
+    strands.forEach((s, i) => {
+      const head = i % 6 === 0;
+      const ax = head ? B.x + (s.u - 0.5) * 20 : B.x + (s.u - 0.5) * 46;
+      const ay = (head ? 136 : 172 - Math.abs(s.u - 0.5) * 12) + by;
+      const az = head ? B.z + 54 + (s.v - 0.5) * 12 : B.z - 36 + s.v * 74;
+      let prev = [ax, ay, az];
+      for (let k = 1; k <= 5; k++) {
+        const q = k / 5, sw = Math.sin(T * s.sp + s.ph + q * 2.4) * 9 * q * q + s.curl * q * q;
+        const p = [ax + sw, ay - s.len * q, az + Math.cos(T * s.sp * 0.8 + s.ph) * 6 * q * q];
+        line(ctx, prev, p); prev = p;
+      }
+      if (i % 3 === 0) tips.push(prev);
+    });
+    ctx.stroke();
+    // bioluminescence
+    ctx.globalCompositeOperation = "lighter";
+    lights.forEach(l => {
+      const [S, K, Ft] = J[l.L], t = l.t, A = t < 1 ? S : K, Bq = t < 1 ? K : Ft, u = t < 1 ? t : t - 1;
+      const P = [A[0] + (Bq[0] - A[0]) * u + l.side * 6, A[1] + (Bq[1] - A[1]) * u, A[2] + (Bq[2] - A[2]) * u];
+      glow(ctx, P, 0.9, 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(T * l.sp + l.ph)));
+    });
+    bodyLights.forEach(l => glow(ctx, [B.x + (l.u - 0.5) * 44, 172 + by, B.z - 36 + l.v * 74], 1.3, 0.3 + 0.7 * (0.5 + 0.5 * Math.sin(T * l.sp + l.ph))));
+    tips.forEach((P, i) => glow(ctx, P, 0.7, 0.4 + 0.6 * (0.5 + 0.5 * Math.sin(T * 1.3 + i))));
+    // marine snow drifting down around it
+    ctx.fillStyle = "rgba(170,215,255,0.55)";
+    for (const p of snow) {
+      const y = 240 - ((240 - p.y + T * 2.2 * p.s) % 240);
+      const c = camPt(B.x + p.x + Math.sin(T * 0.2 + p.z) * 3, y, B.z + p.z);
+      if (c[2] < NEAR) continue;
+      const q = scr(c);
+      if (q[0] < 0 || q[0] > CW || q[1] < 0 || q[1] > HZ * 2) continue;
+      const r = c[2] < 60 ? 2 : 1;
+      ctx.fillRect(q[0], q[1], r, r);
+    }
+    ctx.restore();
+  }
+  return {
+    place, update, draw,
+    show(v) { on = v; alphaT = v ? 1 : 0; if (!v) alpha = 0; },
+    isOn: () => on && alpha > 0.01,
+    presence: () => on ? Math.min(1, alpha) : 0,
+    z: () => B.z,
+    step(stride, dur) { chain = chain.then(() => doStep(stride, dur)); return chain; },
+    stomp(x, z, dur) {                         // it steps over you: a hand comes down right in front
+      if (anim) { const a = anim; anim = null; a.res(); }
+      B.x = x - 6; B.z = z - 34;
+      const L = LIMBS[0];
+      L.f = { x: x + 2, y: 170, z };
+      return new Promise(res => { anim = { L, drop: true, y0: 170, t0: performance.now(), dur: dur * 1000, res }; });
+    },
+    eyes() {
+      if (!on || alpha < 0.3) return [];
+      const T = performance.now() / 1000;
+      headEyes.forEach((e, i) => {
+        e.x = B.x + e.dx; e.y = 146 + e.dy; e.z = B.z + 66;
+        e.open = Math.min(1, alpha) * (Math.sin(T * 0.7 + i * 2.1) > 0.96 ? 0.05 : 1);
+      });
+      return headEyes;
+    }
+  };
+})();
+
+/* ============================================================
+   EYES — pixel eyes all over the graveyard and the sky, blinking out of step
+   ============================================================ */
+const Eyes = (() => {
+  const c = els.eyes, ctx = c.getContext("2d");
+  let on = false, mode = "idle", px = 3, cw = 0, ch = 0, wakeAt = 0, sleepAt = 0;
+  let seed = 1337;
+  const rnd = () => (seed = (seed * 16807) % 2147483647) / 2147483647;
+  const list = [];
+  const add = o => list.push(Object.assign({ base: 0.7 + rnd() * 0.3, next: 0, b0: -1, bd: 160, dbl: false,
+    lookPh: rnd() * 6.28, delay: 600 + rnd() * 6500 }, o));
+  for (let i = 0; i < 18; i++) add({ x: -26 + rnd() * 52, z: 5 + rnd() * 55, y: 0.6 + rnd() * 0.8, size: 0.22 + rnd() * 0.12 });
+  [[-20, 10], [21, 8], [-25, 36], [24, 40], [-15, 55], [16, 56], [28, 22], [-29, 22]].forEach(([x, z]) => {
+    const n = 1 + (rnd() * 3 | 0);
+    for (let k = 0; k < n; k++) add({ x: x + (rnd() - 0.5) * 3, z: z + (rnd() - 0.5) * 2, y: 3 + rnd() * 5, size: 0.3 + rnd() * 0.3 });
+  });
+  for (let i = 0; i < 8; i++) {                    // low in the dark, in pairs
+    const x = -26 + rnd() * 52, z = 6 + rnd() * 50, y = 0.15 + rnd() * 0.3, sz = 0.12 + rnd() * 0.06, pair = { b0: -1, next: 0, bd: 160 };
+    add({ x: x - sz * 0.9, z, y, size: sz, pair }); add({ x: x + sz * 0.9, z, y, size: sz, pair });
+  }
+  for (let i = 0; i < 10; i++) add({ x: -30 + rnd() * 60, z: 58 + rnd() * 20, y: 1 + rnd() * 5, size: 0.6 + rnd() * 0.6 });
+  for (let i = 0; i < 9; i++) add({ sky: true, ang: rnd() * Math.PI * 2, elev: 0.38 + rnd() * 0.32, wcss: 36 + rnd() * 66 });
+  // where you wake up: watching from close by, and from the sky over the house
+  for (let i = 0; i < 14; i++) add({ x: -9 + rnd() * 18, z: 3.5 + rnd() * 22, y: 0.4 + rnd() * 2.2, size: 0.3 + rnd() * 0.22, delay: 400 + rnd() * 5000 });
+  for (let i = 0; i < 6; i++) add({ sky: true, ang: (rnd() - 0.5) * 1.6, elev: 0.42 + rnd() * 0.36, wcss: 42 + rnd() * 70, delay: 1500 + rnd() * 5000 });
+
+  const SCLERA = "rgba(234,230,216,0.92)", IRIS = "#24272d", PUPIL = "#e01b24", LID = "rgba(234,230,216,0.6)", GLINT = "#fff";
+  function openness(e, now) {
+    if (mode !== "stare" && now < wakeAt + e.delay) return 0;            // they open one by one
+    let o = mode === "stare" ? 1 : Math.min(1, (now - wakeAt - e.delay) / 450) * e.base;
+    if (mode === "sleep") o *= 1 - clamp01((now - sleepAt - e.delay * 0.35) / 700);
+    const t = e.pair || e;
+    if (now >= t.next) {
+      t.b0 = now; t.bd = Math.random() < 0.15 ? 600 + Math.random() * 700 : 110 + Math.random() * 170;
+      t.dbl = Math.random() < 0.22;
+      t.next = now + t.bd + (mode === "stare" ? 2500 + Math.random() * 6000 : 300 + Math.random() * 4500);
+    }
+    const p = (now - t.b0) / t.bd;
+    if (p >= 0 && p <= 1) o *= Math.abs(Math.cos(p * Math.PI * (t.dbl ? 2 : 1)));
+    return o;
+  }
+  function drawEye(cx, cy, w, open, look) {
+    cx = Math.round(cx); cy = Math.round(cy);
+    const a = Math.max(1, w >> 1), hh = Math.max(1, Math.round(w * 0.24)), b = hh * open;
+    if (b < 0.5) { ctx.fillStyle = LID; ctx.fillRect(cx - a, cy, a * 2 + 1, 1); return; }
+    ctx.fillStyle = SCLERA;
+    for (let x = -a; x <= a; x++) {
+      const yy = Math.round(b * Math.sqrt(Math.max(0, 1 - Math.pow(x / (a + 0.5), 2))));
+      ctx.fillRect(cx + x, cy - yy, 1, yy * 2 + 1);
+    }
+    if (w < 5) { ctx.fillStyle = PUPIL; ctx.fillRect(cx, cy, 1, 1); return; }
+    const ir = Math.max(1, Math.min(Math.round(b), Math.round(a * 0.45))), ix = Math.round(cx + look * a * 0.4);
+    ctx.fillStyle = IRIS;
+    for (let y = -ir; y <= ir; y++) { const xx = Math.round(Math.sqrt(ir * ir - y * y)); ctx.fillRect(ix - xx, cy + y, xx * 2 + 1, 1); }
+    ctx.fillStyle = PUPIL;
+    const sw = Math.max(1, Math.round(w * 0.07));
+    ctx.fillRect(ix - (sw >> 1), cy - ir, sw, ir * 2 + 1);
+    if (w >= 10) { ctx.fillStyle = GLINT; ctx.fillRect(ix + sw, cy - Math.max(1, ir >> 1), 1, 1); }
+  }
+  function size() {
+    const w = Math.ceil(innerWidth / px), h = Math.ceil(innerHeight / px);
+    if (cw !== w || ch !== h) { cw = c.width = w; ch = c.height = h; }
+  }
+  size(); addEventListener("resize", size);
+  return {
+    show(v) { on = v; if (v) { wakeAt = performance.now(); mode = "idle"; } else ctx.clearRect(0, 0, cw, ch); },
+    setBlock(b) { px = Math.max(3, Math.round(b)); size(); },
+    stare() { mode = "stare"; list.forEach(e => { (e.pair || e).next = 0; }); },
+    calm() { mode = "idle"; wakeAt = performance.now() - 8000; },
+    sleep() { mode = "sleep"; sleepAt = performance.now(); },
+    flinch() { const now = performance.now(); list.forEach(e => { const t = e.pair || e; t.b0 = now; t.bd = 200; t.dbl = false; t.next = now + 900 + Math.random() * 2500; }); },
+    draw(v, now) {
+      if (!on) return;
+      const W = innerWidth, H = innerHeight, f = H * 1.05, hz = H * (0.8 - v.pitch);
+      ctx.clearRect(0, 0, cw, ch);
+      const cyw = Math.cos(v.yaw), syw = Math.sin(v.yaw);
+      const items = list.concat(Giant.eyes());
+      for (const e of items) {
+        let X, Y, w;
+        if (e.sky) {
+          const d = Math.atan2(Math.sin(e.ang - v.yaw), Math.cos(e.ang - v.yaw));
+          if (Math.abs(d) > 1.3) continue;
+          X = W / 2 + d * f * 0.85; Y = hz - e.elev * H; w = e.wcss / px;
+        } else {
+          const dx = e.x - v.x, dz = e.z - v.z, rx = dx * cyw - dz * syw, rz = dx * syw + dz * cyw;
+          if (rz < 0.6) continue;
+          X = W / 2 + rx / rz * f; Y = hz - (e.y - v.h) / rz * f;
+          w = e.size * f / rz / px;
+          if (w < 2.2) continue;
+          w = Math.min(60, w);
+        }
+        const ex = X / px, ey = Y / px;
+        if (ex < -40 || ex > cw + 40 || ey < -40 || ey > ch + 40) continue;
+        const o = e.giant ? e.open : openness(e, now);
+        const look = (mode === "stare" || e.giant) ? Math.max(-1, Math.min(1, (W / 2 - X) / (W * 0.4))) : Math.sin(now / 1000 * 0.4 + e.lookPh) * 0.6;
+        drawEye(ex, ey, Math.max(3, Math.round(w)), o, look);
+      }
+    }
+  };
+})();
+
+/* ============================================================
+   CLUES — the headstone and the door plate, with an unknown script
+   ============================================================ */
+const Glyphs = (() => {
+  function glyph(rnd, ox, oy) {
+    const W = 22, H = 30, parts = [];
+    const P = (x, y) => `${(ox + x).toFixed(1)} ${(oy + y).toFixed(1)}`;
+    const n = 2 + (rnd() < 0.5 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const t = Math.floor(rnd() * 6), x = 4 + rnd() * (W - 8), y = 5 + rnd() * (H - 10);
+      if (t === 0) {          // stem with a hook
+        const y1 = 2 + rnd() * 6, y2 = H - 3 - rnd() * 6, hx = x + (rnd() < 0.5 ? -1 : 1) * (4 + rnd() * 4);
+        parts.push(`M${P(x, y1)} L${P(x, y2)} Q${P(x, y2 + 4)} ${P(hx, y2 + 1)}`);
+      } else if (t === 1) {   // arc
+        const r = 4 + rnd() * 5;
+        parts.push(`M${P(x - r, y)} A${r.toFixed(1)} ${(r * (0.7 + rnd() * 0.6)).toFixed(1)} 0 0 ${rnd() < 0.5 ? 0 : 1} ${P(x + r, y)}`);
+      } else if (t === 2) {   // curl
+        let a = rnd() * 6.28, r = 7 + rnd() * 2, d = `M${P(x + Math.cos(a) * r, y + Math.sin(a) * r)}`;
+        for (let k = 0; k < 8; k++) { a += 1.0; r *= 0.8; d += ` L${P(x + Math.cos(a) * r, y + Math.sin(a) * r)}`; }
+        parts.push(d);
+      } else if (t === 3) {   // dot
+        parts.push(`M${P(x - 1.3, y)} a1.3 1.3 0 1 0 2.6 0 a1.3 1.3 0 1 0 -2.6 0`);
+      } else if (t === 4) {   // bar with a tick
+        const len = 7 + rnd() * 9;
+        parts.push(`M${P(x - len / 2, y)} L${P(x + len / 2, y)} M${P(x - len / 2, y)} L${P(x - len / 2, y + 5)}`);
+      } else {                // tentacle
+        const dx = (rnd() - 0.5) * 12;
+        parts.push(`M${P(x, 2)} C${P(x + 8 + dx, 10)} ${P(x - 8 - dx, 20)} ${P(x + dx * 0.5, H - 2)}`);
+      }
+    }
+    return parts.join(" ");
+  }
+  return {
+    line(seedVal, n, ox, oy, adv = 27) {
+      let s = seedVal;
+      const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+      let d = "";
+      for (let i = 0; i < n; i++) d += glyph(rnd, ox + i * adv, oy) + " ";
+      return d;
+    }
+  };
+})();
+const INK = "#ece6d8";
+const SHARED_GLYPHS = 9133;      // the same words are cut into the headstone and the door plate
+function tombstoneSVG() {
+  const g = Glyphs.line(SHARED_GLYPHS, 7, 200 - 7 * 27 / 2, 438);
+  const sc = "font-family=\"'IM Fell English SC', Georgia, serif\"", it = "font-family=\"'IM Fell English', Georgia, serif\" font-style=\"italic\"";
+  return `<svg viewBox="0 0 400 560" role="img" aria-label="A headstone. It reads: Here sleeps the dreamer. That is not dead which can eternal lie, and with strange aeons even death may die. Find the truth, with the word truth scratched out. Below, a line of unknown characters.">
+    <path d="M40 548 L40 172 A160 150 0 0 1 360 172 L360 548 Z" fill="#070707" stroke="${INK}" stroke-width="3"/>
+    <path d="M60 548 L60 180 A140 128 0 0 1 340 180 L340 548" fill="none" stroke="${INK}" stroke-width="1" opacity=".35"/>
+    <path d="M298 92 L284 130 L296 152 L278 196" fill="none" stroke="${INK}" stroke-width="1.4" opacity=".55"/>
+    <path d="M70 430 L96 446 L88 478 L110 508" fill="none" stroke="${INK}" stroke-width="1.2" opacity=".45"/>
+    <path d="M166 118 Q200 88 234 118 Q200 148 166 118 Z" fill="none" stroke="${INK}" stroke-width="2.2"/>
+    <rect x="198" y="103" width="4" height="30" fill="#c4141e"/>
+    <g fill="${INK}" text-anchor="middle">
+      <text x="200" y="202" ${sc} font-size="26" letter-spacing="5">HERE SLEEPS</text>
+      <text x="200" y="246" ${sc} font-size="32" letter-spacing="4">THE DREAMER</text>
+      <text x="200" y="304" ${it} font-size="16.5">That is not dead which can eternal lie,</text>
+      <text x="200" y="330" ${it} font-size="16.5">And with strange aeons even death may die.</text>
+      <text x="200" y="394" ${sc} font-size="22" letter-spacing="4">FIND THE <tspan id="struck">TRUTH</tspan></text>
+    </g>
+    <path d="${g}" fill="none" stroke="${INK}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" opacity=".6"/>
+  </svg>`;
+}
+function plateSVG() {
+  const l1 = Glyphs.line(4410, 9, 260 - 9 * 27 / 2, 104), l2 = Glyphs.line(SHARED_GLYPHS, 7, 260 - 7 * 27 / 2, 160);
+  const screws = [[36, 36], [484, 36], [36, 264], [484, 264]].map(([x, y]) =>
+    `<circle cx="${x}" cy="${y}" r="7" fill="none" stroke="${INK}" stroke-width="1.6"/><path d="M${x - 4} ${y - 4} L${x + 4} ${y + 4}" stroke="${INK}" stroke-width="1.4"/>`).join("");
+  return `<svg viewBox="0 0 520 300" role="img" aria-label="A metal door plate engraved with two lines of characters in an unknown script, under a carved eye.">
+    <rect x="10" y="10" width="500" height="280" rx="14" fill="#060606" stroke="${INK}" stroke-width="3"/>
+    <rect x="26" y="26" width="468" height="248" rx="8" fill="none" stroke="${INK}" stroke-width="1.2" opacity=".5"/>
+    ${screws}
+    <path d="M236 64 Q260 44 284 64 Q260 84 236 64 Z" fill="none" stroke="${INK}" stroke-width="2"/>
+    <rect x="258" y="54" width="4" height="20" fill="#c4141e"/>
+    <path d="${l1}" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="${l2}" fill="none" stroke="${INK}" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+    <path d="M60 236 C140 224 380 248 460 234" fill="none" stroke="${INK}" stroke-width="1" opacity=".35"/>
+  </svg>`;
+}
+function scratchOut() {                 // someone has gouged a word out of the stone
+  const t = els.inspect.querySelector("#struck");
+  if (!t) return;
+  try {
+    const n = t.getNumberOfChars(), a = t.getStartPositionOfChar(0), b = t.getEndPositionOfChar(n - 1);
+    const y = a.y - 7, x0 = a.x - 7, x1 = b.x + 7, svg = t.ownerSVGElement, NS = "http://www.w3.org/2000/svg";
+    const jag = (yy, amp) => { let d = `M${x0.toFixed(1)} ${yy.toFixed(1)}`; for (let x = x0 + 7; x < x1; x += 7) d += ` L${x.toFixed(1)} ${(yy + (Math.random() - 0.5) * amp).toFixed(1)}`; return d + ` L${x1.toFixed(1)} ${(yy + (Math.random() - 0.5) * amp).toFixed(1)}`; };
+    [[jag(y, 3), 3], [jag(y - 3, 5), 1.8], [`M${(x0 + 3).toFixed(1)} ${(y + 6).toFixed(1)} L${(x1 - 2).toFixed(1)} ${(y - 10).toFixed(1)}`, 1.5]].forEach(([d, w]) => {
+      const p = document.createElementNS(NS, "path");
+      p.setAttribute("d", d); p.setAttribute("fill", "none"); p.setAttribute("stroke", INK); p.setAttribute("stroke-width", w); p.setAttribute("stroke-linecap", "round");
+      svg.appendChild(p);
+    });
+  } catch (e) { t.setAttribute("text-decoration", "line-through"); }
+}
+async function inspect(svg) {
+  els.inspect.innerHTML = svg;
+  els.inspect.hidden = false;
+  scratchOut();
+  requestAnimationFrame(() => requestAnimationFrame(() => els.inspect.classList.add("show")));
+  await sleep(900);
+}
+async function closeInspect() {
+  els.inspect.classList.remove("show");
+  await sleep(900);
+  els.inspect.hidden = true; els.inspect.innerHTML = "";
+}
+
+/* ============================================================
+   SKETCHFAB (the inside of the building)
+   ============================================================ */
+const EMBED = {
+  autostart: 1, preload: 1, camera: 0, dnt: 1, scrollwheel: 0, transparent: 0,
+  ui_infos: 0, ui_controls: 0, ui_stop: 0, ui_inspector: 0, ui_settings: 0, ui_vr: 0, ui_ar: 0,
+  ui_help: 0, ui_fullscreen: 0, ui_annotations: 0, ui_hint: 0, ui_watermark: 0, ui_watermark_link: 0,
+  ui_loading: 0, ui_start: 0, ui_animations: 0, ui_theme: "dark"
+};
+function loadViewer(iframe, uid, onProgress) {
+  return new Promise((resolve, reject) => {
+    if (!window.Sketchfab) { reject(new Error("Sketchfab API script did not load")); return; }
+    const client = new window.Sketchfab("1.12.1", iframe);
+    client.init(uid, Object.assign({}, EMBED, {
+      success(api) {
+        api.start();
+        api.addEventListener("viewerready", () => resolve(api));
+        api.addEventListener("modelLoadProgress", e => {
+          const p = typeof e === "number" ? e : (e && e.progress);
+          if (typeof p === "number" && onProgress) onProgress(p);
+        });
+      },
+      error() { reject(new Error("Sketchfab viewer failed to start for " + uid)); }
+    }));
+  });
+}
+/* The Sketchfab viewer script is fetched here, not in the page head, and retried, so a slow or
+   failed download never holds up the page. If it never arrives, the interior falls back to
+   Sketchfab's plain embed: the model still appears, from its default camera. */
+const SF_API = "https://static.sketchfab.com/api/sketchfab-viewer-1.12.1.js";
+let sfApiP = null;
+function loadSketchfabApi() {
+  if (sfApiP) return sfApiP;
+  const attempt = n => new Promise(resolve => {
+    if (window.Sketchfab) { resolve(true); return; }
+    const s = document.createElement("script");
+    s.src = n ? SF_API + "?retry=" + n : SF_API;
+    s.async = true;
+    const t = setTimeout(() => { s.remove(); resolve(!!window.Sketchfab); }, 15000);
+    s.onload = () => { clearTimeout(t); resolve(!!window.Sketchfab); };
+    s.onerror = () => { clearTimeout(t); s.remove(); resolve(false); };
+    document.head.appendChild(s);
+  });
+  sfApiP = (async () => {
+    for (let n = 0; n < 3; n++) {
+      if (await attempt(n)) return true;
+      await sleep(1500 * (n + 1));
+    }
+    console.warn("The Sketchfab viewer script could not be loaded; using the plain embed for the interior.");
+    return false;
+  })();
+  return sfApiP;
+}
+function plainEmbed(iframe, uid) {
+  return new Promise(resolve => {
+    const q = new URLSearchParams(EMBED).toString();
+    iframe.addEventListener("load", () => setTimeout(() => resolve({ plain: true }), 9000), { once: true });
+    iframe.src = `https://sketchfab.com/models/${uid}/embed?${q}`;
+  });
+}
+function startViscera() {
+  if (visceraP) return;
+  visceraP = loadSketchfabApi().then(ok => {
+    if (!ok) return plainEmbed(els.vViscera, VISCERA_UID);
+    return loadViewer(els.vViscera, VISCERA_UID, p => { visceraProgress = p; })
+      .then(api => new Promise(resolve => {
+        api.setFov(VISCERA_CAM.fov, () => {
+          api.setCameraLookAt(VISCERA_CAM.p, VISCERA_CAM.t, 0, () => setTimeout(() => resolve(api), 300));
+        });
+      }))
+      .catch(e => { console.warn(e); return plainEmbed(els.vViscera, VISCERA_UID); });
+  });
+  visceraP.then(api => { visceraApi = api; }).catch(e => console.warn(e));
+}
+
+/* ============================================================
+   AUDIO — everything is synthesised
+   ============================================================ */
+const Sound = {
+  ctx: null, out: null, noise: null, on: true, beatTimer: null, breathTimer: null, birdTimer: null,
+  drone: null, screechNode: null, room: null,
+  init() {
+    if (this.ctx) { if (this.ctx.resume) this.ctx.resume(); return; }
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    this.ctx = new AC();
+    this.out = this.ctx.createGain();
+    this.out.gain.value = this.on ? 0.9 : 0;
+    this.out.connect(this.ctx.destination);
+    const len = this.ctx.sampleRate * 2, buf = this.ctx.createBuffer(1, len, this.ctx.sampleRate), d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.noise = buf;
+  },
+  setOn(v) { this.on = v; if (this.ctx) this.out.gain.setTargetAtTime(v ? 0.9 : 0, this.ctx.currentTime, 0.05); },
+  env(g, t, peak, attack, release) {
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(peak, t + attack);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + attack + release);
+  },
+  noiseSrc() { const s = this.ctx.createBufferSource(); s.buffer = this.noise; s.loop = true; return s; },
+  burst(type, freq, q, peak, attack, release, t) {
+    const c = this.ctx; t = t || c.currentTime;
+    const n = this.noiseSrc(), f = c.createBiquadFilter(), g = c.createGain();
+    f.type = type; f.frequency.value = freq; f.Q.value = q;
+    this.env(g, t, peak, attack, release); n.connect(f).connect(g).connect(this.out);
+    n.start(t, Math.random()); n.stop(t + attack + release + 0.05);
+    return f;
+  },
+  tone(type, f0, f1, peak, attack, release, t) {
+    const c = this.ctx; t = t || c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f1, t + attack + release);
+    this.env(g, t, peak, attack, release); o.connect(g).connect(this.out); o.start(t); o.stop(t + attack + release + 0.05);
+  },
+  impact() {
+    if (!this.ctx) return;
+    this.tone("sine", 120, 26, 0.9, 0.01, 1.5);
+    const f = this.burst("lowpass", 2400, 0.7, 0.55, 0.005, 1.3);
+    f.frequency.exponentialRampToValueAtTime(90, this.ctx.currentTime + 1.3);
+  },
+  tinnitus(sec = 8) {
+    if (!this.ctx) return; const c = this.ctx, t = c.currentTime;
+    const o = c.createOscillator(), g = c.createGain();
+    o.type = "sine"; o.frequency.setValueAtTime(4700, t); o.frequency.linearRampToValueAtTime(4550, t + sec);
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.03, t + 0.25);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + sec);
+    o.connect(g).connect(this.out); o.start(t); o.stop(t + sec + 0.2);
+  },
+  thump(t, gain) { if (this.ctx) this.tone("sine", 68, 38, gain, 0.012, 0.2, t); },
+  heartbeat(on, gap = 760, growth = 1.06) {
+    clearTimeout(this.beatTimer);
+    if (!this.ctx || !on) return;
+    const beat = () => {
+      const t = this.ctx.currentTime + 0.02;
+      this.thump(t, 0.8); this.thump(t + 0.24, 0.55);
+      gap = Math.min(gap * growth, 1500);
+      this.beatTimer = setTimeout(beat, gap);
+    };
+    beat();
+  },
+  startDrone() {
+    if (!this.ctx || this.drone) return; const c = this.ctx, t = c.currentTime;
+    const bus = c.createGain(); bus.gain.setValueAtTime(0.0001, t); bus.gain.exponentialRampToValueAtTime(0.07 * this.droneScale, t + 5);
+    const lp = c.createBiquadFilter(); lp.type = "lowpass"; lp.frequency.value = 170; lp.Q.value = 6;
+    const lfo = c.createOscillator(), lfoG = c.createGain(); lfo.frequency.value = 0.07; lfoG.gain.value = 70;
+    lfo.connect(lfoG).connect(lp.frequency); lfo.start(t);
+    [43.65, 44.1, 65.4].forEach((fr, i) => {
+      const o = c.createOscillator(); o.type = "sawtooth"; o.frequency.value = fr; o.detune.value = i * 7;
+      o.connect(lp); o.start(t);
+    });
+    const wind = this.noiseSrc(), bp = c.createBiquadFilter(), wg = c.createGain();
+    bp.type = "bandpass"; bp.frequency.value = 420; bp.Q.value = 0.8; wg.gain.value = 0.18;
+    const wl = c.createOscillator(), wlg = c.createGain(); wl.frequency.value = 0.11; wlg.gain.value = 0.14;
+    wl.connect(wlg).connect(wg.gain); wl.start(t);
+    wind.connect(bp).connect(wg).connect(bus); wind.start(t);
+    lp.connect(bus); bus.connect(this.out);
+    this.drone = bus;
+  },
+  droneScale: 1, droneLevel: 0.07,
+  droneTo(v, sec) { this.droneLevel = v; if (this.drone) this.drone.gain.setTargetAtTime(Math.max(v * this.droneScale, 0.0001), this.ctx.currentTime, sec / 3); },
+  quietDrone(on) { this.droneScale = on ? 0.45 : 1; if (this.drone) this.droneTo(this.droneLevel, 2); },
+  tick() { if (this.ctx) this.burst("bandpass", rand(2600, 3500), 3, 0.16, 0.002, 0.04); },
+  thud() { if (this.ctx) this.thump(this.ctx.currentTime + 0.01, 0.7); },
+  step(fast) {
+    if (!this.ctx) return;
+    this.burst("bandpass", rand(450, 750), 0.9, fast ? 0.34 : 0.24, 0.006, fast ? 0.09 : 0.12);
+    this.tone("sine", 95, 45, fast ? 0.2 : 0.13, 0.006, 0.1);
+  },
+  breath(on, fast = true) {
+    clearTimeout(this.breathTimer);
+    if (!this.ctx || !on) return;
+    let inhale = true;
+    const go = () => {
+      const t = this.ctx.currentTime, dur = fast ? (inhale ? 0.42 : 0.5) : (inhale ? 0.9 : 1.1);
+      const f = this.burst("bandpass", inhale ? 900 : 620, 0.7, inhale ? 0.1 : 0.13, dur * 0.4, dur * 0.6, t);
+      f.frequency.linearRampToValueAtTime(inhale ? 1200 : 480, t + dur);
+      inhale = !inhale;
+      this.breathTimer = setTimeout(go, dur * 1000 + (fast ? 60 : 300));
+    };
+    go();
+  },
+  whoosh() {
+    if (!this.ctx) return; const t = this.ctx.currentTime;
+    const f = this.burst("bandpass", 2600, 1.4, 0.55, 0.16, 0.18, t);
+    f.frequency.exponentialRampToValueAtTime(280, t + 0.32);
+  },
+  giantStep(vol) {           // a footfall of something enormous
+    if (!this.ctx) return; const t = this.ctx.currentTime;
+    this.tone("sine", 46, 19, 0.95 * vol, 0.02, 2.4);
+    const f = this.burst("lowpass", 220, 0.7, 0.75 * vol, 0.01, 2.0);
+    f.frequency.exponentialRampToValueAtTime(60, t + 2);
+    this.burst("bandpass", 1800, 0.6, 0.12 * vol, 0.01, 0.5, t + 0.05);
+  },
+  giantCall() {              // a long, low, wavering call
+    if (!this.ctx) return; const c = this.ctx, t = c.currentTime;
+    const bus = c.createGain();
+    bus.gain.setValueAtTime(0.0001, t); bus.gain.exponentialRampToValueAtTime(0.16, t + 1.2);
+    bus.gain.setValueAtTime(0.16, t + 3); bus.gain.exponentialRampToValueAtTime(0.0001, t + 5.5);
+    const bp = c.createBiquadFilter(); bp.type = "bandpass"; bp.Q.value = 5;
+    bp.frequency.setValueAtTime(260, t); bp.frequency.linearRampToValueAtTime(620, t + 2.4); bp.frequency.linearRampToValueAtTime(220, t + 5.5);
+    [48, 72.3, 96.6].forEach((fr, i) => {
+      const o = c.createOscillator(); o.type = "sawtooth";
+      o.frequency.setValueAtTime(fr, t); o.frequency.linearRampToValueAtTime(fr * 0.93, t + 5.5);
+      const l = c.createOscillator(), lg = c.createGain(); l.frequency.value = 4.5 + i; lg.gain.value = fr * 0.02;
+      l.connect(lg).connect(o.frequency); l.start(t); l.stop(t + 5.6);
+      o.connect(bp); o.start(t); o.stop(t + 5.6);
+    });
+    bp.connect(bus); bus.connect(this.out);
+  },
+  squelch() {                // many eyes opening at once
+    if (!this.ctx) return; const t = this.ctx.currentTime;
+    for (let i = 0; i < 9; i++) this.burst("bandpass", rand(700, 1600), 6, 0.12, 0.004, 0.06, t + i * rand(0.02, 0.06));
+  },
+  cut() {
+    if (!this.ctx) return; const t = this.ctx.currentTime;
+    if (this.screechNode) { this.screechNode.gain.cancelScheduledValues(t); this.screechNode.gain.setValueAtTime(0.0001, t); this.screechNode = null; }
+    this.heartbeat(false); this.breath(false);
+    if (this.drone) { this.drone.gain.cancelScheduledValues(t); this.drone.gain.setValueAtTime(0.0001, t); }
+    this.tone("sine", 70, 24, 1.0, 0.004, 1.8);
+    this.burst("lowpass", 300, 0.7, 0.7, 0.003, 1.2);
+  },
+  creak() {
+    if (!this.ctx) return; const c = this.ctx, t = c.currentTime;
+    const o = c.createOscillator(), bp = c.createBiquadFilter(), g = c.createGain();
+    o.type = "sawtooth"; o.frequency.setValueAtTime(150, t); o.frequency.linearRampToValueAtTime(95, t + 2.2);
+    const wob = c.createOscillator(), wg = c.createGain(); wob.frequency.value = 13; wg.gain.value = 22;
+    wob.connect(wg).connect(o.frequency); wob.start(t); wob.stop(t + 2.4);
+    bp.type = "bandpass"; bp.frequency.value = 850; bp.Q.value = 9;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.35, t + 0.25);
+    g.gain.setValueAtTime(0.35, t + 1.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.3);
+    o.connect(bp).connect(g).connect(this.out); o.start(t); o.stop(t + 2.4);
+  },
+  wet(v = 0.5) {             // flesh moving against flesh
+    if (!this.ctx) return; const t = this.ctx.currentTime;
+    for (let i = 0; i < 3 + (v * 4 | 0); i++) this.burst("bandpass", rand(260, 900), 5, 0.1 * v, 0.004, rand(0.05, 0.14), t + i * rand(0.03, 0.08));
+    this.tone("sine", rand(110, 160), 60, 0.08 * v, 0.01, 0.25, t);
+  },
+  gurgle() {                 // something moving inside the guts
+    if (!this.ctx) return; const t = this.ctx.currentTime, n = 2 + (Math.random() * 4 | 0);
+    for (let i = 0; i < n; i++) {
+      const at = t + i * rand(0.07, 0.16);
+      this.tone("sine", rand(70, 140), rand(180, 320), 0.07, 0.02, 0.12, at);
+      this.burst("lowpass", rand(250, 500), 2, 0.05, 0.01, 0.15, at);
+    }
+  },
+  lunge() { if (!this.ctx) return; this.impact(); this.wet(1); this.burst("bandpass", 600, 1.2, 0.5, 0.005, 0.5); },
+  grow(sec = 3) {            // guts stretching as they grow, a low wet groan
+    if (!this.ctx) return; const c = this.ctx, t = c.currentTime;
+    const o = c.createOscillator(), bp = c.createBiquadFilter(), g = c.createGain();
+    o.type = "sawtooth"; o.frequency.setValueAtTime(rand(38, 50), t); o.frequency.linearRampToValueAtTime(rand(62, 80), t + sec);
+    const wob = c.createOscillator(), wg = c.createGain(); wob.frequency.value = rand(5, 9); wg.gain.value = 6;
+    wob.connect(wg).connect(o.frequency); wob.start(t); wob.stop(t + sec + 0.1);
+    bp.type = "bandpass"; bp.frequency.value = 330; bp.Q.value = 4;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.16, t + sec * 0.3);
+    g.gain.setValueAtTime(0.16, t + sec * 0.7); g.gain.exponentialRampToValueAtTime(0.0001, t + sec);
+    o.connect(bp).connect(g).connect(this.out); o.start(t); o.stop(t + sec + 0.1);
+    for (let i = 0; i < sec * 2; i++) this.burst("bandpass", rand(300, 800), 4, 0.05, 0.005, 0.12, t + rand(0, sec));
+  },
+  drip() {                   // a drop falling from high above, onto stone
+    if (!this.ctx) return; const t = this.ctx.currentTime;
+    this.tone("sine", rand(1500, 1900), 700, 0.16, 0.003, 0.16, t);
+    this.burst("bandpass", 2400, 4, 0.05, 0.002, 0.05, t);
+    this.tone("sine", rand(900, 1100), 600, 0.04, 0.01, 0.5, t + 0.18);   // its echo
+  },
+  rope() {                   // a rope taking weight, slowly
+    if (!this.ctx) return; const c = this.ctx, t = c.currentTime;
+    const o = c.createOscillator(), bp = c.createBiquadFilter(), g = c.createGain();
+    o.type = "sawtooth"; o.frequency.setValueAtTime(rand(70, 85), t); o.frequency.linearRampToValueAtTime(rand(55, 62), t + 2.8);
+    const wob = c.createOscillator(), wg = c.createGain(); wob.frequency.value = 7; wg.gain.value = 9;
+    wob.connect(wg).connect(o.frequency); wob.start(t); wob.stop(t + 3);
+    bp.type = "bandpass"; bp.frequency.value = 520; bp.Q.value = 7;
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.2, t + 0.6);
+    g.gain.setValueAtTime(0.2, t + 1.9); g.gain.exponentialRampToValueAtTime(0.0001, t + 2.9);
+    o.connect(bp).connect(g).connect(this.out); o.start(t); o.stop(t + 3);
+  },
+  stopMorning() {
+    clearTimeout(this.birdTimer); this.birdTimer = null;
+    if (this.room && this.ctx) { this.room.gain.cancelScheduledValues(this.ctx.currentTime); this.room.gain.setTargetAtTime(0.0001, this.ctx.currentTime, 0.05); this.room = null; }
+  },
+  morning() {
+    if (!this.ctx) return; const c = this.ctx, t = c.currentTime;
+    const n = this.noiseSrc(), lp = c.createBiquadFilter(), g = c.createGain();
+    lp.type = "lowpass"; lp.frequency.value = 380; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 4);
+    n.connect(lp).connect(g).connect(this.out); n.start(t); this.room = g;
+    const chirp = () => {
+      const s = this.ctx.currentTime, k = 1 + (Math.random() * 3 | 0), base = rand(2800, 4200);
+      for (let i = 0; i < k; i++) {
+        const o = this.ctx.createOscillator(), gg = this.ctx.createGain(), at = s + i * rand(0.09, 0.14);
+        o.type = "sine"; o.frequency.setValueAtTime(base, at); o.frequency.exponentialRampToValueAtTime(base * rand(1.15, 1.45), at + 0.07);
+        this.env(gg, at, 0.05, 0.01, 0.07); o.connect(gg).connect(this.out); o.start(at); o.stop(at + 0.1);
+      }
+      this.birdTimer = setTimeout(chirp, rand(500, 2600));
+    };
+    this.birdTimer = setTimeout(chirp, 1200);
+  }
+};
+
+els.sound.addEventListener("click", () => {
+  Sound.init();
+  Sound.setOn(!Sound.on);
+  Music.mute(!Sound.on);
+  els.sound.setAttribute("aria-pressed", String(Sound.on));
+  els.sound.querySelector("span").textContent = Sound.on ? "Sound on" : "Sound off";
+  els.sound.querySelectorAll(".w").forEach(p => p.style.opacity = Sound.on ? 1 : 0);
+});
+
+/* ============================================================
+   MUSIC — two tracks kept next to index.html: one for outside the house, one for inside.
+   If they are missing, the game simply plays without them.
+   ============================================================ */
+const Music = (() => {
+  const T = {
+    outside: { src: "music-outside.mp3", vol: 0.5 },
+    inside:  { src: "music-inside.mp3",  vol: 0.55, gapless: true }
+  };
+  const viaGraph = location.protocol !== "file:";   // a page opened from disk cannot route its own audio files through Web Audio
+  let cur = null, muted = false;
+  function element(t) {
+    if (!t.el) {
+      t.el = new Audio(); t.el.src = t.src; t.el.loop = true; t.el.preload = "auto"; t.el.volume = 0;
+      t.el.addEventListener("playing", () => { if (cur === t) Sound.quietDrone(true); });
+    }
+    return t.el;
+  }
+  function gainOf(t) {
+    if (!viaGraph || !Sound.ctx) return null;
+    if (!t.gain) { t.gain = Sound.ctx.createGain(); t.gain.gain.value = 0.0001; t.gain.connect(Sound.out); }
+    return t.gain;
+  }
+  // the inside track loops without a seam: decoded once and played from memory
+  function loadBuffer(t) {
+    if (t.bufP) return t.bufP;
+    t.bufP = fetch(t.src).then(r => { if (!r.ok) throw new Error("HTTP " + r.status); return r.arrayBuffer(); })
+      .then(ab => new Promise((res, rej) => Sound.ctx.decodeAudioData(ab, res, rej)))
+      .then(buf => {   // skip the encoder's silent padding at either end
+        const ch = buf.getChannelData(0); let a = 0, b = ch.length - 1;
+        while (a < b && Math.abs(ch[a]) < 1e-4) a++;
+        while (b > a && Math.abs(ch[b]) < 1e-4) b--;
+        t.span = [a / buf.sampleRate, (b + 1) / buf.sampleRate];
+        return buf;
+      })
+      .catch(e => { console.warn("Music not found:", t.src, e.message || e); return null; });
+    return t.bufP;
+  }
+  function ramp(t, v, sec) {
+    const g = gainOf(t);
+    if (g) {
+      const now = Sound.ctx.currentTime;
+      g.gain.cancelScheduledValues(now); g.gain.setValueAtTime(Math.max(g.gain.value, 0.0001), now);
+      g.gain.linearRampToValueAtTime(Math.max(v, 0.0001), now + Math.max(sec, 0.01));
+      return;
+    }
+    // without Web Audio: step the element's own volume (an iPhone ignores this and plays at full volume)
+    clearInterval(t.fade);
+    const el = element(t), from = el.volume, t0 = performance.now();
+    t.fade = setInterval(() => {
+      const k = Math.min(1, (performance.now() - t0) / Math.max(sec * 1000, 1));
+      el.volume = Math.max(0, Math.min(1, from + (v - from) * k));
+      if (k >= 1) clearInterval(t.fade);
+    }, 50);
+  }
+  function startElement(t) {
+    const el = element(t);
+    if (viaGraph && Sound.ctx && !t.wired) {
+      try { Sound.ctx.createMediaElementSource(el).connect(gainOf(t)); t.wired = true; el.volume = 1; } catch (e) {}
+    }
+    const p = el.play(); if (p && p.catch) p.catch(() => {});
+  }
+  function start(t) {
+    if (!(viaGraph && Sound.ctx && t.gapless)) { startElement(t); return; }
+    loadBuffer(t).then(buf => {
+      if (cur !== t) return;
+      if (!buf) { startElement(t); return; }
+      stopSource(t);
+      const s = Sound.ctx.createBufferSource();
+      s.buffer = buf; s.loop = true; s.loopStart = t.span[0]; s.loopEnd = t.span[1];
+      s.connect(gainOf(t)); s.start(0, t.span[0]); t.node = s;
+      Sound.quietDrone(true);
+    });
+  }
+  function stopSource(t) { if (t.node) { try { t.node.stop(); } catch (e) {} t.node = null; } }
+  function halt(t) { if (cur === t) return; stopSource(t); if (t.el) t.el.pause(); }
+  return {
+    unlock() {   // called inside the first click, so the browser lets both tracks play later on
+      if (!Sound.ctx) return;
+      Object.values(T).forEach(t => {
+        if (t.gapless && viaGraph) { loadBuffer(t); return; }
+        const el = element(t), p = el.play();
+        if (p && p.then) p.then(() => { if (cur !== t) el.pause(); }).catch(() => {});
+      });
+    },
+    play(name, sec = 4) {
+      const t = T[name];
+      if (!t || cur === t || !Sound.ctx) return;
+      const prev = cur; cur = t;
+      start(t); ramp(t, t.vol, sec);
+      if (prev) { ramp(prev, 0, sec); setTimeout(() => halt(prev), sec * 1000 + 200); }
+    },
+    stop(sec = 2) {
+      const t = cur; if (!t) return;
+      cur = null; ramp(t, 0, sec); setTimeout(() => halt(t), sec * 1000 + 200);
+      Sound.quietDrone(false);
+    },
+    mute(m) { muted = m; Object.values(T).forEach(t => { if (t.el && !t.wired) t.el.muted = m; }); },
+    get playing() { return !!cur; }
+  };
+})();
+
+/* ============================================================
+   OLD-FILM LAYER
+   ============================================================ */
+(() => {
+  const g = els.grain, gx = g.getContext("2d");
+  const d = els.dust, dx = d.getContext("2d");
+  const frames = [];
+  let dpr = 1, last = 0, lastDust = 0;
+  const W = 320, H = 180; g.width = W; g.height = H;
+  for (let f = 0; f < 6; f++) {
+    const img = gx.createImageData(W, H), p = img.data;
+    for (let i = 0; i < p.length; i += 4) { const v = Math.random() * 255 | 0; p[i] = p[i + 1] = p[i + 2] = v; p[i + 3] = 255; }
+    frames.push(img);
+  }
+  function resize() { dpr = 1; d.width = innerWidth; d.height = innerHeight; }
+  resize(); addEventListener("resize", resize);
+  function drawDust() {
+    dx.clearRect(0, 0, d.width, d.height);
+    if (Math.random() < 0.35) {
+      dx.fillStyle = `rgba(240,236,226,${rand(0.25, 0.6)})`;
+      dx.fillRect(Math.random() * d.width, 0, Math.max(1, dpr * (Math.random() < 0.8 ? 1 : 2)), d.height);
+    }
+    const n = Math.random() * 6 | 0;
+    for (let i = 0; i < n; i++) {
+      dx.fillStyle = Math.random() < 0.5 ? "rgba(240,236,226,.6)" : "rgba(0,0,0,.75)";
+      dx.beginPath();
+      dx.ellipse(Math.random() * d.width, Math.random() * d.height, (1 + Math.random() * 3) * dpr, (0.6 + Math.random() * 2) * dpr, Math.random() * 3, 0, Math.PI * 2);
+      dx.fill();
+    }
+  }
+  function frame(now) {
+    const real = document.body.classList.contains("real");
+    if (now - last > 42) {
+      last = now;
+      gx.putImageData(frames[Math.random() * frames.length | 0], 0, 0);
+      els.flicker.style.opacity = REDUCED || real ? 0 : (Math.random() * 0.07 + (Math.random() < 0.03 ? 0.12 : 0)).toFixed(3);
+    }
+    if (now - lastDust > 83) { lastDust = now; drawDust(); }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+})();
+
+/* ============================================================
+   FX — one loop: virtual camera, background, graveyard, fog,
+   sway, walking bob, hits, trembling and blur
+   ============================================================ */
+const FX = {
+  sway: 0, swayT: 0, bob: 0, bobT: 0, stepDur: 0.55, phase: 0,
+  trauma: 0, page: 0, pageT: 0, tilt: 0, tiltT: 0, drop: 0, dropT: 0, scale: 1.04, scaleT: 1.04,
+  blur: 0, blurT: 0, blurRate: 2.5, bright: 1, brightT: 1, split: 0, splitT: 0, hook: null,
+  kick(v) { this.trauma = Math.min(1.25, this.trauma + v); },
+  jump(o) { for (const k in o) { this[k] = o[k]; if ((k + "T") in this) this[k + "T"] = o[k]; } }
+};
+const nz = (t, a, b, c) => Math.sin(t * a) * 0.5 + Math.sin(t * b + 1.3) * 0.3 + Math.sin(t * c + 2.1) * 0.2;
+let fxLast = performance.now(), stageFilter = "", stageTf = "";
+// if the frame rate stays low, render the house and fog smaller (up to three steps)
+let perfFrames = 0, perfTime = 0, perfHold = 0, perfOn = false;
+function watchFrameRate(now, dt) {
+  if (!perfOn || document.hidden || mosaicBlock > 1 || qLevel >= 3) return;
+  if (now < perfHold) { perfFrames = 0; perfTime = 0; return; }
+  perfFrames++; perfTime += dt;
+  if (perfTime < 2.5) return;
+  const fps = perfFrames / perfTime;
+  perfFrames = 0; perfTime = 0;
+  if (fps < 42) {
+    qLevel++;
+    applyHouseSize(); FogGL.resize();
+    perfHold = now + 2500;   // let it settle before judging again
+  }
+}
+function fxFrame(now) {
+  const dt = Math.min(0.05, (now - fxLast) / 1000); fxLast = now;
+  const T = now / 1000, m = REDUCED ? 0.2 : 1;
+  const ease = (cur, tgt, rate) => cur + (tgt - cur) * (1 - Math.exp(-dt * rate));
+  if (FX.hook) FX.hook(now);
+  View.step(now);
+  if (View.drift) {                       // the title: a slow, uneasy drift in front of the house
+    View.yaw = 0.07 * Math.sin(T * 0.11); View.z = 2 + 2.5 * Math.sin(T * 0.07); View.x = 0.8 * Math.sin(T * 0.05);
+  }
+  FX.sway = ease(FX.sway, FX.swayT, 1.2); FX.bob = ease(FX.bob, FX.bobT, 3); FX.page = ease(FX.page, FX.pageT, 5);
+  FX.tilt = ease(FX.tilt, FX.tiltT, 3); FX.drop = ease(FX.drop, FX.dropT, 3); FX.scale = ease(FX.scale, FX.scaleT, 2);
+  FX.blur = ease(FX.blur, FX.blurT, FX.blurRate); FX.bright = ease(FX.bright, FX.brightT, 2.5); FX.split = ease(FX.split, FX.splitT, 1.5);
+  FX.trauma = Math.max(0, FX.trauma - dt * 0.55);
+
+  // stage: drunk sway + walking bob + hit shake + tilt
+  const s = FX.sway * m;
+  let x = s * (30 * Math.sin(T * 1.25) + 10 * Math.sin(T * 3.4 + 0.7));
+  let y = s * (18 * Math.sin(T * 1.05 + 1.2) + 7 * Math.sin(T * 4.1));
+  let r = s * (2.4 * Math.sin(T * 0.85 + 0.4) + 0.7 * Math.sin(T * 2.7));
+  const prev = FX.phase; FX.phase += dt / FX.stepDur;
+  if (FX.bob > 0.35 && Math.floor(FX.phase) !== Math.floor(prev)) Sound.step(FX.stepDur < 0.42);
+  const b = FX.bob * m, sp = Math.sin(Math.PI * FX.phase);
+  y += -b * 8 * Math.abs(sp); x += b * 5 * sp; r += b * 0.5 * sp;
+  const tr = FX.trauma * FX.trauma * m;
+  x += tr * 60 * nz(T * 9, 3.1, 5.7, 9.3); y += tr * 45 * nz(T * 9 + 5, 2.7, 6.1, 8.9); r += tr * 7 * nz(T * 9 + 9, 2.3, 4.9, 7.7);
+  r += FX.tilt; y += FX.drop;
+  const stf = `translate(${x.toFixed(1)}px,${y.toFixed(1)}px) rotate(${r.toFixed(2)}deg) scale(${FX.scale.toFixed(3)})`;
+  if (stf !== stageTf) { stageTf = stf; els.stage.style.transform = stf; }
+  watchFrameRate(now, dt);
+
+  // the whole page trembling (crouched, holding your head)
+  const p = FX.page * m;
+  if (p > 0.002) {
+    els.world.style.transform = `translate(${(p * 26 * nz(T * 14, 3.3, 7.1, 11.7)).toFixed(2)}px,${(p * 20 * nz(T * 14 + 3, 2.9, 6.6, 12.4)).toFixed(2)}px) rotate(${(p * 2.4 * nz(T * 14 + 7, 3.7, 5.3, 9.9)).toFixed(3)}deg)`;
+  } else if (els.world.style.transform) els.world.style.transform = "";
+
+  // blur / brightness of what you see
+  const filt = (FX.blur > 0.05 || Math.abs(FX.bright - 1) > 0.01) ? `blur(${FX.blur.toFixed(2)}px) brightness(${FX.bright.toFixed(3)})` : "none";
+  if (filt !== stageFilter) { stageFilter = filt; els.stage.style.filter = filt; }
+
+  const bgVis = applyBackground();
+  Giant.update(now);
+  Yard.draw(View, FX.split, T);
+  Eyes.draw(View, now);
+  FogGL.draw(now, dt, View, bgVis);
+  requestAnimationFrame(fxFrame);
+}
+requestAnimationFrame(fxFrame);
+
+/* ============================================================
+   EYELIDS, BLACK, FLASH
+   ============================================================ */
+let lidV = 0;   // 0 open … 1 shut
+const lidY = (side, v) => `translateY(${side * (110 - v * 98)}%)`;
+function lidsAnim(frames, ms, easing = "ease-in-out") {
+  const kf = side => frames.map(([o, v]) => ({ offset: o, transform: lidY(side, v) }));
+  els.lidTop.getAnimations().forEach(a => a.cancel()); els.lidBot.getAnimations().forEach(a => a.cancel());
+  els.lidTop.animate(kf(-1), { duration: ms, easing, fill: "forwards" });
+  const a = els.lidBot.animate(kf(1), { duration: ms, easing, fill: "forwards" });
+  lidV = frames[frames.length - 1][1];
+  return a.finished.catch(() => {});
+}
+const lidsTo = (v, ms, easing) => lidsAnim([[0, lidV], [1, v]], Math.max(ms, 1), easing);
+
+let blackV = 0;
+function blackTo(v, ms) {
+  els.black.getAnimations().forEach(a => a.cancel());
+  const a = els.black.animate([{ opacity: blackV }, { opacity: v }], { duration: Math.max(ms, 1), easing: "ease-in-out", fill: "forwards" });
+  blackV = v;
+  return a.finished.catch(() => {});
+}
+function flashTo(v, ms, easing = "ease-out") {
+  const from = getComputedStyle(els.flash).opacity;
+  els.flash.getAnimations().forEach(a => a.cancel());
+  return els.flash.animate([{ opacity: from }, { opacity: v }], { duration: Math.max(ms, 1), easing, fill: "forwards" }).finished.catch(() => {});
+}
+function pulseFlash(peak, inMs, outMs) {
+  els.flash.getAnimations().forEach(a => a.cancel());
+  return els.flash.animate([{ opacity: 0 }, { opacity: peak, offset: inMs / (inMs + outMs) }, { opacity: 0 }],
+    { duration: inMs + outMs, easing: "ease-out", fill: "forwards" }).finished.catch(() => {});
+}
+/* ============================================================
+   LOADER — black, with faint attempts to open your eyes
+   ============================================================ */
+const Loader = (() => {
+  let on = false, timer = null, textFn = null, textTimer = null;
+  function attempt() {
+    if (!on) return;
+    const peak = rand(0.12, 0.38), open = rand(0.1, 0.42), ms = rand(650, 1300);
+    els.slit.animate([
+      { opacity: 0, transform: "scaleY(.02)" },
+      { opacity: peak, transform: `scaleY(${open})`, offset: 0.42 },
+      { opacity: peak * 0.75, transform: `scaleY(${open * 0.8})`, offset: 0.6 },
+      { opacity: 0, transform: "scaleY(.02)" }
+    ], { duration: ms, easing: "ease-in-out" });
+    if (Math.random() < 0.45) els.haze.animate([{ opacity: 0 }, { opacity: rand(0.03, 0.08), offset: 0.4 }, { opacity: 0 }], { duration: ms * 0.9 });
+    const flutter = Math.random() < 0.3;
+    timer = setTimeout(attempt, flutter ? ms + rand(80, 200) : ms + rand(700, 2100));
+  }
+  return {
+    show(fn) {
+      textFn = fn; on = true;
+      els.loader.hidden = false; els.loader.classList.remove("gone");
+      els.loadText.classList.remove("err");
+      clearTimeout(timer); clearInterval(textTimer);
+      const upd = () => { if (textFn) els.loadText.textContent = textFn(); };
+      upd(); textTimer = setInterval(upd, 300);
+      timer = setTimeout(attempt, 400);
+    },
+    hide() { on = false; clearTimeout(timer); clearInterval(textTimer); els.loader.classList.add("gone"); }
+  };
+})();
+
+/* ============================================================
+   TEXT AND CHOICES
+   ============================================================ */
+const TYPE = {   // [ms per letter, random extra, pause on …, jitter in em]
+  q:       [95, 70, 900, 0.08],
+  shout:   [34, 26, 380, 0.16],
+  thought: [62, 40, 700, 0],
+  inner:   [62, 40, 700, 0],
+  real:    [55, 30, 600, 0]
+};
+async function say(text, style = "q") {
+  els.dialog.hidden = false;
+  els.dialog.classList.remove("dim");
+  els.dialog.classList.toggle("center", style === "voice" || style === "thought");
+  els.dialog.classList.toggle("light", style === "real");
+  els.line.className = style;
+  els.line.textContent = "";
+  if (style === "voice") {
+    els.line.textContent = text;
+    els.line.animate([{ opacity: 0, transform: "scale(1.18)", filter: "blur(10px)" }, { opacity: 1, transform: "none", filter: "blur(0)" }],
+      { duration: 160, easing: "ease-out" });
+    return;
+  }
+  const [base, extra, pause, jit] = TYPE[style];
+  for (const ch of text) {
+    const sp = document.createElement("span");
+    sp.className = "ch";
+    sp.textContent = ch;
+    if (jit) {
+      sp.style.setProperty("--jx", ((Math.random() - 0.5) * jit).toFixed(3) + "em");
+      sp.style.setProperty("--jy", ((Math.random() - 0.5) * jit).toFixed(3) + "em");
+      sp.style.setProperty("--jr", ((Math.random() - 0.5) * jit * 38).toFixed(2) + "deg");
+      sp.style.animationDelay = (-Math.random() * 0.16).toFixed(3) + "s";
+    }
+    els.line.appendChild(sp);
+    if (ch !== " " && style !== "real") Sound.tick();
+    await sleep(ch === "…" ? pause : ch === " " ? base * 1.3 : base + Math.random() * extra);
+  }
+}
+async function clearLine(fade = true) {
+  if (fade && els.line.textContent) { els.line.classList.add("out"); await sleep(800); }
+  els.line.textContent = ""; els.line.className = "";
+}
+function choose(list) {
+  return new Promise(resolve => {
+    els.dialog.hidden = false;
+    els.dialog.classList.remove("dim", "center", "light");
+    els.choices.innerHTML = "";
+    list.forEach(([key, label], i) => {
+      const btn = document.createElement("button");
+      btn.type = "button"; btn.className = "choice"; btn.textContent = label;
+      btn.style.animationDelay = (i * 0.25) + "s";
+      btn.addEventListener("click", () => {
+        if (btn.disabled) return;
+        els.choices.querySelectorAll("button").forEach(x => x.disabled = true);
+        Sound.thud();
+        els.choices.innerHTML = "";
+        resolve(key);
+      });
+      els.choices.appendChild(btn);
+      requestAnimationFrame(() => btn.classList.add("show"));
+    });
+  });
+}
+function showEnd(kind, sub) {
+  els.dialog.hidden = true;
+  const html = {
+    good: `<h2>Good End</h2><p>${sub || "You're home."}</p><button id="restart" type="button">Start over</button>`,
+    tbc:  `<h2>To be continued&hellip;</h2><button id="restart" type="button">Start over</button>`,
+    open: `<h2>Open your eyes</h2><p>Somewhere, someone is waking up.<br>You can't tell if it's you.</p><button id="restart" type="button">Start over</button>`,
+    fail: `<h2>The building wouldn't open. Check your internet connection, then start over.</h2><button id="restart" type="button">Start over</button>`
+  }[kind];
+  els.end.className = kind;
+  els.end.innerHTML = html;
+  els.end.hidden = false;
+  els.end.querySelector("#restart").addEventListener("click", () => location.reload());
+  requestAnimationFrame(() => requestAnimationFrame(() => els.end.classList.add("show")));
+}
+
+/* ============================================================
+   TITLE
+   ============================================================ */
+function showTitle() {
+  els.wake.innerHTML = "";
+  [..."Open your eyes"].forEach((ch, i) => {
+    const s = document.createElement("span");
+    s.className = "ch"; s.textContent = ch === " " ? " " : ch; s.setAttribute("aria-hidden", "true");
+    s.style.animationDelay = (0.25 + i * 0.07 + Math.random() * 0.1).toFixed(2) + "s";
+    els.wake.appendChild(s);
+  });
+  let again = false;
+  try { again = localStorage.getItem("oye-again") === "1"; localStorage.removeItem("oye-again"); } catch (e) {}
+  els.title.querySelector(".hint").textContent = again ? "again?" : "click to wake";
+  els.title.hidden = false;
+  View.drift = true;
+  FogGL.target(0.6);
+  perfOn = true; perfHold = performance.now() + 2000;
+  Loader.hide();
+  requestAnimationFrame(() => { els.wake.classList.add("in"); els.title.classList.add("ready"); });
+  (function falter() {   // now and then the glow falters like an old bulb
+    if (els.title.hidden) return;
+    setTimeout(() => {
+      if (els.title.hidden || REDUCED) return;
+      els.wake.classList.add("dip");
+      setTimeout(() => {
+        els.wake.classList.remove("dip");
+        if (Math.random() < 0.5) setTimeout(() => { els.wake.classList.add("dip"); setTimeout(() => els.wake.classList.remove("dip"), 60); }, 90);
+        falter();
+      }, 70);
+    }, rand(2500, 6500));
+  })();
+}
+
+/* ============================================================
+   SCENES
+   ============================================================ */
+async function wake() {
+  Sound.init(); Sound.impact(); Sound.tinnitus();
+  Music.unlock(); Music.play("outside", 8);   // the music outside the house, rising as you come round
+  els.wake.classList.add("leaving"); els.title.classList.add("gone"); els.wake.disabled = true;
+  await flashTo(1, 140, "ease-in");
+
+  // behind the white: you are lying among the graves, facing the house
+  els.title.hidden = true;
+  View.drift = false;
+  await View.to(WAKE_SPOT, 0);
+  Yard.show(true);
+  Eyes.show(true);
+  FogGL.target(0.6);
+  Sound.heartbeat(true);
+
+  const BLOCKS = [40, 26, 16, 10, 6, 3, 1];
+  setMosaic(BLOCKS[0]);
+  FX.blurRate = 2.5;
+  const start = performance.now();
+  FX.hook = now => {
+    const t = clamp01((now - start) / WAKE_MS);
+    FX.sway = FX.swayT = 0.06 + 0.94 * (1 - smooth(0, 1, t));
+    FX.split = FX.splitT = 1 - smooth(0.05, 0.95, t);
+    FX.blur = FX.blurT = 4 * (1 - smooth(0.55, 1, t));
+    FX.bright = FX.brightT = 1 + 0.55 * (1 - smooth(0, 0.45, t));
+    FX.scale = FX.scaleT = 1.12 - 0.08 * smooth(0, 1, t);
+    setMosaic(BLOCKS[Math.min(BLOCKS.length - 1, Math.floor(Math.pow(smooth(0, 0.84, t), 1.5) * BLOCKS.length))]);
+  };
+  lidsAnim([[0, 0], [0.18, 0], [0.26, 0.4], [0.33, 0.07], [0.48, 0.11], [0.55, 0.62], [0.62, 0.15], [0.8, 0.04], [0.86, 0.33], [0.92, 0], [1, 0]], WAKE_MS);
+  flashTo(0, 2600, "cubic-bezier(.3,.1,.3,1)");
+  setTimeout(() => Sound.startDrone(), 1800);
+  setTimeout(() => Sound.heartbeat(false), WAKE_MS * 0.85);
+  await sleep(WAKE_MS);
+  FX.hook = null;
+  setMosaic(1);
+  startViscera();   // the building's interior loads quietly while you look around
+  await sleep(500);
+}
+
+async function lookAround() {
+  els.dialog.classList.add("dim");
+  await sleep(900);
+  await clearLine(false);
+  await View.to({ yaw: 0.95 }, 2.8); await sleep(700);
+  await View.to({ yaw: -0.95 }, 4.4); await sleep(700);
+  await View.to({ yaw: 0 }, 2.6);
+}
+
+function distantStep(vol) { Sound.giantStep(vol); FX.kick(0.18); Eyes.flinch(); }
+
+async function walkAround() {
+  els.dialog.classList.add("dim");
+  FogGL.target(0.95);
+  Sound.droneTo(0.09, 3);
+  await sleep(700);
+  FX.stepDur = 0.56; FX.bobT = 1; FX.swayT = 0.05;
+  await View.to({ x: 6, z: 9, yaw: 0.5 }, 5.0, "in");
+  await View.to({ x: 13, z: 22, yaw: 0.62 }, 4.6, "linear");
+  // one headstone is larger than the others
+  FX.bobT = 0;
+  await sleep(600);
+  const c = await choose([["read", "read the headstone"], ["walk", "keep walking"]]);
+  if (c === "read") {
+    els.dialog.classList.add("dim");
+    await inspect(tombstoneSVG());
+    await choose([["walk", "keep walking"]]);
+    closeInspect();
+  }
+  els.dialog.classList.add("dim");
+  FX.bobT = 1;
+  distantStep(0.18);
+  await View.to({ x: 9, z: 35, yaw: -0.9 }, 4.6, "in");
+  distantStep(0.26);
+  await View.to({ x: -6, z: 40, yaw: -2.0 }, 4.6, "linear");
+  await View.to({ x: -15, z: 28, yaw: -2.7 }, 5.2, "linear");
+  FX.bobT = 0;
+}
+
+// the giant follows on its own while you run
+let pursueToken = 0;
+function pursue(toZ, stride, dur) {
+  const tok = ++pursueToken;
+  (async () => { while (tok === pursueToken && Giant.z() < toZ) await Giant.step(stride, dur); })();
+}
+function stopPursuit() { pursueToken++; }
+
+async function giantReveal() {
+  await sleep(600);
+  distantStep(0.42);
+  await sleep(1300);
+  Eyes.stare(); Sound.squelch();             // every eye in the graveyard opens at once
+  FogGL.target(1);
+  Giant.place(-30, -200); Giant.show(true);
+  Sound.heartbeat(true, 700, 0.97);
+  await View.to({ yaw: -3.05, pitch: -0.24 }, 3.2, "inOut");   // turn round and look up
+  Sound.giantCall();
+  await sleep(2600);
+  await Giant.step(36, 1.5);
+  await sleep(700);
+}
+
+async function chaseRun() {
+  Sound.breath(true); Sound.heartbeat(true, 420, 1);
+  FX.stepDur = 0.3; FX.bobT = 1.25; FX.swayT = 0.12;
+  pursue(-60, 100, 1.0);
+  await View.to({ yaw: 0.45, pitch: 0 }, 0.6, "out");
+  await View.to({ x: -9, z: 39, yaw: 0.45 }, 2.4, "linear");
+  // looking back over your shoulder as you run
+  Sound.whoosh();
+  View.to({ yaw: -2.85, pitch: -0.32 }, 0.7, "out");
+  FX.pageT = 0.3;
+  const run = View.to({ x: -4, z: 47 }, 5.8, "linear");
+  await sleep(400);
+  await say("Fuck….What the fuck is this world.", "shout");
+  await sleep(1400);
+  await say("What the fuck is that fucking thing!!!", "shout");
+  await run;
+  await sleep(500);
+  FX.pageT = 0;
+  pursue(-30, 60, 1.3);
+  await clearLine(true);
+  await View.to({ yaw: 0.3, pitch: 0 }, 0.6, "out");
+  await View.to({ x: 0, z: 56, yaw: 0 }, 2.6, "linear");
+  FX.bobT = 0;
+  pursue(-15, 30, 1.8);                       // it keeps coming while you decide
+}
+
+async function finalStomp() {
+  stopPursuit();
+  els.dialog.classList.add("dim");
+  FX.stepDur = 0.29; FX.bobT = 1.3;
+  const run = View.to({ x: 0, z: 61, yaw: 0 }, 1.6, "linear");
+  await sleep(450);
+  await Giant.stomp(1.5, View.z + 10.5, 0.55);   // it steps right over you
+  Sound.tinnitus(7); FX.page = 0.7;
+  pulseFlash(0.5, 30, 300);
+  FX.bobT = 0;
+  await run;
+  lidsAnim([[0, 0], [0.2, 1], [0.35, 0.3], [0.6, 1], [1, 1]], 1400);
+  await sleep(1300);
+  // cut to black
+  blackTo(1, 0); Sound.cut();
+  Giant.show(false); Eyes.calm();
+  FX.jump({ page: 0, tilt: 0, blur: 0 }); FX.trauma = 0; FX.swayT = 0; FX.sway = 0;
+  lidsTo(0, 1);
+  await clearLine(false);
+  await sleep(260);
+  pulseFlash(0.35, 30, 220);
+  await say("You should know what the fucking happen.", "voice");
+  await sleep(3600);
+  await clearLine(true);
+  await sleep(500);
+  await say("Yes I should know what the fuck is going on.", "thought");
+  await sleep(2600);
+  await clearLine(true);
+  // at the door
+  await View.to(DOOR, 0);
+  FX.jump({ drop: 0 }); FX.swayT = 0.06; FX.blurT = 0;
+  FogGL.target(0.55); Sound.droneTo(0.07, 2);
+  await sleep(600);
+  await blackTo(0, 2200);
+}
+
+async function soTired() {
+  stopPursuit();
+  els.dialog.classList.add("dim");
+  FX.bobT = 0;
+  View.to({ h: 1.0 }, 1.4, "inOut");                  // you sink to your knees
+  await View.to({ yaw: -2.95, pitch: -0.3 }, 2.6, "inOut");   // and turn to watch it come
+  Eyes.sleep();
+  await Giant.step(40, 1.8);
+  await Giant.step(40, 1.8);
+  await sleep(400);
+  return goodEnd();
+}
+
+async function walkToDoor() {
+  els.dialog.classList.add("dim");
+  await sleep(900);
+  await clearLine(false);
+  FX.stepDur = 0.46; FX.bobT = 1; FogGL.target(0.8);
+  await View.to(DOOR, 8.5, "inOut");
+  FX.bobT = 0;
+}
+
+async function atTheDoor() {
+  const c = await choose([["plate", "look at the door plate"], ["enter", "Go in this building"]]);
+  if (c === "plate") {
+    els.dialog.classList.add("dim");
+    View.to({ z: 67.5, zoom: 0.62 }, 1.4, "inOut");
+    await inspect(plateSVG());
+    await sleep(900);
+    await say("What is this language.", "inner");
+    await sleep(1600);
+    await choose([["enter", "Go in this building"]]);
+    closeInspect();
+  }
+  return enterBuilding();
+}
+
+/* ============================================================
+   INSIDE — a round room of flesh. The dreamer hangs upside down above the mound.
+   Every position here was measured in the model (Z-up, metres). The shots share
+   one fov, because Sketchfab can only change the fov instantly.
+   ============================================================ */
+const FLOOR_Z = 1.37;                                                      // the tiled dais
+const TILE = { th: 27.5 * Math.PI / 180, sz: 0.6, ox: 0.76, oy: 0.48 };   // its checkerboard
+const HEAD = [0.08, 0.17, 5.69];                                           // his head is the lowest part of him
+const BODY_AXIS = [-0.05, -0.04];
+const SHOT_FLESH = { p: [0.15, -3.9, 2.85],  t: [0.05, -0.7, 2.55],  fov: 62 };  // the mound of hands
+const SHOT_UP    = { p: [0.05, -3.7, 2.95],  t: [-0.06, -0.05, 5.25], fov: 62 }; // and above it, him
+const SHOT_LEFT  = { p: [-1.3, -3.5, 2.95],  t: [-2.05, -1.95, 2.75], fov: 62 }; // the front-left pillar
+const SHOT_RIGHT = { p: [3.0, -3.2, 2.9],    t: [3.95, -1.55, 1.37],  fov: 62 }; // the floor on the right
+const SHOT_KNEEL = { p: [3.55, -2.35, 2.25], t: [3.97, -1.6, 1.37],   fov: 62 };
+const SHOT_GUT   = { p: [0.6, -3.0, 2.3],    t: [0.3, -1.2, 1.45],    fov: 62 }; // crouched by an intestine
+const SHOT_NEAR  = { p: [0.35, -0.75, 6.35], t: [-0.04, -0.05, 6.15], fov: 62 }; // risen up beside him, close enough to touch
+const SHOT_DOWN  = { p: [0.8, -1.35, 6.35],  t: [-0.1, 0.05, 3.3],    fov: 62 }; // looking down past him at the mound
+const SHOT_WRAP  = { p: [0.5, -0.95, 6.2],   t: [-0.04, -0.05, 6.05], fov: 62 }; // back to him, as the hands take hold
+const SHOT_FACE  = { p: [0.082, -0.36, 5.62], t: [0.082, 0.19, 5.665], fov: 62 }; // his wrapped face, upside down
+const FACE_EYES  = [[0.052, 0.12, 5.665], [0.112, 0.12, 5.665]];                  // on the dark band across the wrapping
+const CARVING    = { c: [-2.09, -1.9, 2.8], right: [0.94, 0.35, 0], up: [0, 0, 1], w: 0.36, h: 0.12 };
+const PHOTO_AT   = { u: 5.48, v: -4.5, rot: 0.32, w: 0.16, h: 0.19 };     // in tile units; the chip is at corner (5, -5)
+
+const V3 = {
+  sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+  add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+  mul: (a, k) => [a[0] * k, a[1] * k, a[2] * k],
+  dot: (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2],
+  cross: (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]],
+  norm: a => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; }
+};
+function tileToWorld(u, v) {
+  const a = (u - TILE.ox) * TILE.sz, b = (v - TILE.oy) * TILE.sz, c = Math.cos(TILE.th), s = Math.sin(TILE.th);
+  return [a * c - b * s, a * s + b * c, FLOOR_Z];
+}
+// a projector for a camera {p, t}; Sketchfab's fov is vertical
+function makeProj(cam, W, H, fov = 62) {
+  const f = (H / 2) / Math.tan(fov * Math.PI / 360);
+  const fw = V3.norm(V3.sub(cam.t, cam.p)), rt = V3.norm(V3.cross(fw, [0, 0, 1])), up = V3.cross(rt, fw);
+  const fn = p => { const d = V3.sub(p, cam.p), z = V3.dot(d, fw); return { x: W / 2 + V3.dot(d, rt) / z * f, y: H / 2 - V3.dot(d, up) / z * f, z, s: f / z }; };
+  fn.f = f; fn.fw = fw; fn.rt = rt; fn.up = up;
+  return fn;
+}
+function projectShot(p, shot) {
+  const q = makeProj(shot, innerWidth, innerHeight, shot.fov)(p);
+  return { x: q.x, y: q.y, z: q.z, f: q.s * q.z };
+}
+
+const insideApi = () => (visceraApi && !visceraApi.plain ? visceraApi : null);
+function vcamTo(shot, sec) {
+  const api = insideApi();
+  LiveCam.target(shot, sec);
+  if (!api) return sleep(sec * 1000);
+  try { api.setCameraEasing("easeInOutQuad"); api.setCameraLookAt(shot.p, shot.t, sec); } catch (e) { console.warn(e); }
+  return sleep(sec * 1000 + 150);
+}
+function vShot(api, w, h) {
+  return new Promise(res => {
+    try {
+      api.getScreenShot(w, h, "image/jpeg", (e, d) => {
+        if (e || !d) { res(null); return; }
+        const i = new Image(); i.onload = () => res(i); i.onerror = () => res(null); i.src = d;
+      });
+    } catch (e) { res(null); }
+  });
+}
+async function freshVShot(api) {       // the first capture after a camera move can be stale
+  await withTimeout(vShot(api, 64, 48), 3000).catch(() => null);
+  await sleep(120);
+  return withTimeout(vShot(api, innerWidth, innerHeight), 6000).catch(() => null);
+}
+function vPickInfo(api, x, y) {
+  return new Promise(res => {
+    const to = setTimeout(() => res(null), 1500);
+    try {
+      api.pickFromScreen([x, y], (e, info) => {
+        clearTimeout(to);
+        if (e || !info || !info.position3D) { res(null); return; }
+        const p = info.position3D;
+        res({ p: [+p[0], +p[1], +p[2]], mat: info.material && info.material.name, id: info.instanceID });
+      });
+    } catch (e) { clearTimeout(to); res(null); }
+  });
+}
+const vPick = (api, x, y) => vPickInfo(api, x, y).then(r => r && r.p);
+
+/* Where the Sketchfab camera is right now, asked for every frame while something is drawn
+   on top of the room. Until the first answer, it is assumed to be heading where we sent it. */
+const LiveCam = (() => {
+  let cam = null, users = 0, raf = 0, askedAt = 0, waiting = false, from = null, to = null, t0 = 0, dur = 0;
+  function guess(now) {   // eased like Sketchfab's own move, for the plain embed or a slow answer
+    if (!to) return cam;
+    const k = dur > 0 ? clamp01((now - t0) / (dur * 1000)) : 1, e = k < 0.5 ? 2 * k * k : 1 - Math.pow(-2 * k + 2, 2) / 2;
+    if (!from) return { p: to.p, t: to.t };
+    return { p: from.p.map((v, i) => v + (to.p[i] - v) * e), t: from.t.map((v, i) => v + (to.t[i] - v) * e) };
+  }
+  function poll(now) {
+    if (!users) { raf = 0; return; }
+    const api = insideApi();
+    if (api && (!waiting || now - askedAt > 600)) {
+      waiting = true; askedAt = now;
+      try { api.getCameraLookAt((e, c) => { waiting = false; if (!e && c && c.position) cam = { p: c.position.map(Number), t: c.target.map(Number), at: performance.now() }; }); }
+      catch (e) { waiting = false; }
+    }
+    raf = requestAnimationFrame(poll);
+  }
+  return {
+    use() { users++; if (!raf) raf = requestAnimationFrame(poll); },
+    release() { users = Math.max(0, users - 1); },
+    target(shot, sec) { from = cam || (to && guess(performance.now())) || null; to = { p: shot.p, t: shot.t }; t0 = performance.now(); dur = sec; },
+    get() {
+      const now = performance.now();
+      if (cam && insideApi() && now - cam.at < 1500) return cam;
+      return guess(now) || cam;
+    }
+  };
+})();
+
+/* Eyes that are part of the wall. Their lids are cut from a picture of the wall
+   itself, so a shut eye is just wall. They open slowly, blink slowly and look about. */
+const WallEyes = (() => {
+  const c = els.wallEyes, ctx = c.getContext("2d");
+  let img = null, eyes = [], on = false, W = 0, H = 0, last = 0, mode = "wander", target = null, sample = null, sW = 0, sH = 0;
+  function size() { W = innerWidth; H = innerHeight; if (c.width !== W || c.height !== H) { c.width = W; c.height = H; } }
+  function prepSample() {   // a small copy of the wall picture, to light and tint each eye like the wall around it
+    sample = null;
+    if (!img) return;
+    sW = Math.max(1, Math.round(W / 8)); sH = Math.max(1, Math.round(H / 8));
+    try {
+      const cv = document.createElement("canvas"); cv.width = sW; cv.height = sH;
+      const x = cv.getContext("2d", { willReadFrequently: true }); x.drawImage(img, 0, 0, sW, sH);
+      sample = x.getImageData(0, 0, sW, sH).data;
+    } catch (e) { sample = null; }
+  }
+  function tintAt(x, y, r) {
+    let R = 0, G = 0, B = 0, n = 0;
+    if (sample) {
+      const x0 = Math.max(0, Math.floor((x - r) / 8)), x1 = Math.min(sW - 1, Math.ceil((x + r) / 8));
+      const y0 = Math.max(0, Math.floor((y - r) / 8)), y1 = Math.min(sH - 1, Math.ceil((y + r) / 8));
+      for (let j = y0; j <= y1; j++) for (let i = x0; i <= x1; i++) { const k = (j * sW + i) * 4; R += sample[k]; G += sample[k + 1]; B += sample[k + 2]; n++; }
+    }
+    if (!n) { R = 170; G = 160; B = 140; n = 1; }
+    R /= n; G /= n; B /= n;
+    const lum = (0.2126 * R + 0.7152 * G + 0.0722 * B) / 255, mx = Math.max(R, G, B, 1);
+    const L = Math.max(0.38, Math.min(1, lum * 2.3 + 0.16));   // a dark wall makes a dim eye
+    const col = [R, G, B].map(v => Math.round(255 * L * (0.45 + 0.55 * v / mx)));
+    return { css: `rgb(${col.join(",")})`, L };
+  }
+  function make(x, y, w, extra) {
+    const veins = Array.from({ length: 5 }, () => {
+      const s = Math.random() < 0.5 ? -1 : 1;
+      return [s * 0.49, rand(-0.25, 0.25), s * rand(0.3, 0.4), rand(-0.4, 0.4), s * rand(0.18, 0.27), rand(-0.2, 0.2)];
+    });
+    return Object.assign({ x, y, w, rot: rand(-0.22, 0.22), o: 0, oT: 0, rate: 0.45, b0: -1, bd: 1200,
+      nextBlink: performance.now() + rand(4000, 9000), gx: 0, gy: 0, gxT: rand(-0.8, 0.8), gyT: rand(-0.3, 0.3), nextGaze: 0,
+      hue: rand(0, 1), dil: 0, dilT: 0, tint: tintAt(x, y, w * 0.6), veins }, extra || {});
+  }
+  function blink(e, now) {
+    if (now > e.nextBlink && e.o > 0.6) { e.b0 = now; e.bd = rand(900, 1700); e.nextBlink = now + e.bd + rand(3500, 9000); }
+    const p = (now - e.b0) / e.bd;
+    return p >= 0 && p <= 1 ? 1 - Math.sin(Math.PI * p) : 1;
+  }
+  function look(e, how) {
+    if (how === "you") { e.gxT = 0; e.gyT = 0; return; }
+    if (how === "left" || how === "right") { e.gxT = how === "left" ? -0.95 : 0.95; e.gyT = rand(-0.15, 0.25); return; }
+    if (how === "down") { e.gxT = (W / 2 - e.x) / W; e.gyT = 0.75; return; }
+    if (how === "him" && target) {
+      const dx = target.x - e.x, dy = target.y - e.y, l = Math.hypot(dx, dy) || 1;
+      e.gxT = dx / l * 0.95; e.gyT = dy / l * 0.75; return;
+    }
+    e.gxT = rand(-0.95, 0.95); e.gyT = rand(-0.6, 0.6);
+  }
+  const almond = (w, h, s) => { ctx.moveTo(-w / 2 * s, 0); ctx.quadraticCurveTo(0, -h * 1.2 * s, w / 2 * s, 0); ctx.quadraticCurveTo(0, h * s, -w / 2 * s, 0); };
+  const slit = (w, h, k) => { ctx.moveTo(-w * 0.48, 0); ctx.quadraticCurveTo(0, h * k * 0.9, w * 0.48, 0); ctx.quadraticCurveTo(0, -h * 1.2 * k, -w * 0.48, 0); };
+  function patch(e, rr) {   // the wall picture under this eye, drawn in screen space
+    if (!img) return;
+    ctx.save();
+    ctx.rotate(-e.rot); ctx.translate(-e.x, -e.y);
+    const r = e.w * rr, bx = Math.max(0, e.x - r), by = Math.max(0, e.y - r), bw = Math.min(W, e.x + r) - bx, bh = Math.min(H, e.y + r) - by;
+    const kx = img.width / W, ky = img.height / H;
+    if (bw > 0 && bh > 0) ctx.drawImage(img, bx * kx, by * ky, bw * kx, bh * ky, bx, by, bw, bh);
+    ctx.restore();
+  }
+  function drawEye(e, now) {
+    const w = e.w, h = w * 0.36, o = clamp01(e.o * blink(e, now));
+    ctx.save();
+    ctx.translate(e.x, e.y); ctx.rotate(e.rot);
+    if (o > 0.02) {
+      ctx.save(); ctx.beginPath(); almond(w, h, 1); ctx.clip();
+      // a wet, yellowed eyeball sunk in shadow
+      const g = ctx.createRadialGradient(0, -h * 0.1, h * 0.1, 0, 0, w * 0.55);
+      g.addColorStop(0, "#d2c8a6"); g.addColorStop(0.55, "#8d8367"); g.addColorStop(1, "#211e17");
+      ctx.fillStyle = g; ctx.fillRect(-w / 2, -h * 1.3, w, h * 2.6);
+      ctx.strokeStyle = "rgba(128,22,22,0.55)"; ctx.lineWidth = Math.max(0.6, w * 0.008);
+      ctx.beginPath(); for (const v of e.veins) { ctx.moveTo(v[0] * w, v[1] * h); ctx.quadraticCurveTo(v[2] * w, v[3] * h, v[4] * w, v[5] * h); } ctx.stroke();
+      const ix = e.gx * w * 0.22, iy = e.gy * h * 0.3, ir = h * 0.8;
+      const gi = ctx.createRadialGradient(ix, iy, ir * 0.12, ix, iy, ir);
+      gi.addColorStop(0, e.hue < 0.5 ? "#6a7340" : "#7a6235"); gi.addColorStop(0.65, "#2b3220"); gi.addColorStop(1, "#070906");
+      ctx.fillStyle = gi; ctx.beginPath(); ctx.arc(ix, iy, ir, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "rgba(255,40,40,0.28)"; ctx.beginPath(); ctx.ellipse(ix, iy, ir * 0.34, ir * 0.88, 0, 0, Math.PI * 2); ctx.fill();
+      const px = ir * (0.15 + 0.28 * e.dil), py = ir * (0.8 - 0.3 * e.dil);
+      ctx.fillStyle = "#b3101a"; ctx.beginPath(); ctx.ellipse(ix, iy, px, py, 0, 0, Math.PI * 2); ctx.fill();
+      // lit and tinted like the wall it grew from, with the wall's grain running across it
+      ctx.globalCompositeOperation = "multiply"; ctx.fillStyle = e.tint.css; ctx.fillRect(-w / 2, -h * 1.3, w, h * 2.6);
+      ctx.globalCompositeOperation = "soft-light"; ctx.globalAlpha = 0.6; patch(e, 0.62); ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = "lighter";
+      ctx.fillStyle = "rgba(150,6,14,0.4)"; ctx.beginPath(); ctx.ellipse(ix, iy, px * 1.15, py * 1.04, 0, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = "source-over";
+      ctx.fillStyle = `rgba(255,255,240,${(0.2 + 0.45 * e.tint.L).toFixed(3)})`; ctx.beginPath(); ctx.ellipse(ix + ir * 0.35, iy - ir * 0.42, ir * 0.14, ir * 0.09, -0.5, 0, Math.PI * 2); ctx.fill();
+      const sg = ctx.createLinearGradient(0, -h * 1.2, 0, h * 0.4);   // the upper lid's shadow on the ball
+      sg.addColorStop(0, "rgba(0,0,0,0.85)"); sg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = sg; ctx.fillRect(-w / 2, -h * 1.2, w, h * 1.6);
+      ctx.restore();
+    }
+    // the lids: the wall's own surface everywhere in the almond except the open slit
+    ctx.save();
+    ctx.beginPath(); almond(w, h, 1.18); slit(w, h, o); ctx.clip("evenodd");
+    patch(e, 0.66);
+    if (o > 0.02) {   // the lids swell and sink around the opening
+      const rg = ctx.createRadialGradient(0, 0, h * 0.5, 0, 0, w * 0.62);
+      rg.addColorStop(0, `rgba(0,0,0,${(0.5 * o).toFixed(3)})`); rg.addColorStop(1, "rgba(0,0,0,0)");
+      ctx.fillStyle = rg; ctx.fillRect(-w, -w, w * 2, w * 2);
+    }
+    ctx.restore();
+    if (o > 0.02) {   // wet rims and a fold of skin: what makes the wall read as flesh
+      for (const [lw, a] of [[0.05, 0.14], [0.026, 0.3], [0.012, 0.45]]) {   // a soft wet edge, not an outline
+        ctx.lineWidth = Math.max(1, w * lw); ctx.strokeStyle = `rgba(0,0,0,${(a * o).toFixed(3)})`;
+        ctx.beginPath(); slit(w, h, o); ctx.stroke();
+      }
+      ctx.lineWidth = Math.max(0.8, w * 0.01); ctx.strokeStyle = `rgba(150,60,55,${(0.35 * o).toFixed(3)})`;
+      ctx.beginPath(); ctx.moveTo(-w * 0.44, h * 0.04); ctx.quadraticCurveTo(0, h * o * 0.98, w * 0.44, h * 0.04); ctx.stroke();
+      for (const [lw, a] of [[0.07, 0.1], [0.04, 0.16], [0.018, 0.2]]) {
+        ctx.lineWidth = Math.max(1, w * lw); ctx.strokeStyle = `rgba(0,0,0,${(a * o).toFixed(3)})`;
+        ctx.beginPath(); ctx.moveTo(-w * 0.42, -h * 0.25); ctx.quadraticCurveTo(0, -h * (1.35 + 0.55 * o), w * 0.42, -h * 0.25); ctx.stroke();
+      }
+      ctx.lineWidth = 1; ctx.strokeStyle = `rgba(230,240,220,${(0.13 * o).toFixed(3)})`;
+      ctx.beginPath(); ctx.moveTo(-w * 0.38, -h * 0.36); ctx.quadraticCurveTo(0, -h * (1.47 + 0.55 * o), w * 0.38, -h * 0.36); ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function frame(now) {
+    if (!on) return;
+    const dt = Math.min(0.1, (now - last) / 1000); last = now;
+    ctx.clearRect(0, 0, W, H);
+    for (const e of eyes) {
+      e.o += Math.max(-dt * e.rate, Math.min(dt * e.rate, e.oT - e.o));
+      const P = Tension.pointer;
+      if (mode === "wander" && now - P.t < 1600) {   // while your hand moves, they follow it
+        const dx = P.x - e.x, dy = P.y - e.y, l = Math.hypot(dx, dy) || 1, k = Math.min(1, l / 260);
+        e.gxT = dx / l * 0.95 * k; e.gyT = dy / l * 0.7 * k; e.nextGaze = now + rand(800, 2500);
+      } else if (mode === "wander" && now > e.nextGaze) {
+        e.nextGaze = now + rand(2200, 6000);
+        const r = Math.random();
+        look(e, r < 0.35 ? "you" : r < 0.6 ? "him" : "away");
+      }
+      const k = 1 - Math.exp(-dt * (mode === "wander" ? 1.1 : 1.8));   // slow, deliberate turns
+      e.gx += (e.gxT - e.gx) * k; e.gy += (e.gyT - e.gy) * k; e.dil += (e.dilT - e.dil) * (1 - Math.exp(-dt * 0.8));
+      drawEye(e, now);
+    }
+    requestAnimationFrame(frame);
+  }
+  return {
+    // find bare wall in the current (still) view and put shut eyes there
+    async setupWalls(api, shot, n) {
+      size();
+      img = await freshVShot(api);
+      if (!img) return false;
+      prepSample();
+      const f = (H / 2) / Math.tan(shot.fov * Math.PI / 360), t0 = performance.now();
+      const cand = [];
+      for (let gy = 0.08; gy < 0.9; gy += 0.09) for (let gx = 0.05; gx < 0.96; gx += 0.07) {
+        const x = (gx + rand(-0.025, 0.025)) * W, y = (gy + rand(-0.025, 0.025)) * H;
+        if (target && Math.abs(x - target.x) < W * 0.13 && Math.abs(y - target.y) < H * 0.3) continue;   // keep him clear
+        if (y > H * 0.62 && Math.abs(x - W / 2) < W * 0.3) continue;   // and the choices
+        cand.push([x, y]);
+      }
+      cand.sort(() => Math.random() - 0.5);
+      eyes = [];
+      for (const [x, y] of cand) {
+        if (eyes.length >= n || performance.now() - t0 > 4500) break;
+        const hit = await vPickInfo(api, x, y), p = hit && hit.p;
+        if (!p || p[2] < 1.8) continue;
+        if (hit.mat ? hit.mat !== "Wall_Mat" : Math.hypot(p[0], p[1]) < 6.4) continue;   // walls only
+        const dist = Math.hypot(p[0] - shot.p[0], p[1] - shot.p[1], p[2] - shot.p[2]);
+        const w = rand(0.5, 1.05) * f / dist;
+        if (w < 30 || w > 190) continue;
+        if (eyes.some(e => Math.hypot(e.x - x, e.y - y) < (e.w + w) * 0.75)) continue;
+        eyes.push(make(x, y, w));
+      }
+      return eyes.length > 0;
+    },
+    async setupFace(api, shot) {
+      size();
+      img = await freshVShot(api);
+      if (!img) return false;
+      prepSample();
+      eyes = FACE_EYES.map(p => {
+        const q = projectShot(p, shot);
+        return make(q.x, q.y, 0.03 * q.f / q.z, { rot: Math.PI, rate: 0.28, gxT: 0, gyT: 0, nextBlink: performance.now() + 60000 });   // he is upside down
+      });
+      mode = "stare";
+      return true;
+    },
+    setTarget(x, y) { target = { x, y }; },
+    focus(how) {   // null = let them wander again
+      mode = how ? "stare" : "wander";
+      eyes.forEach(e => { if (how) look(e, how); else e.nextGaze = performance.now() + rand(300, 2500); });
+    },
+    start() { if (on) return; on = true; mode = "wander"; last = performance.now(); requestAnimationFrame(frame); },
+    stop() { on = false; ctx.clearRect(0, 0, c.width, c.height); eyes = []; img = null; },
+    openOneByOne(spread) { eyes.forEach((e, i) => setTimeout(() => { e.oT = 1; }, i * spread + Math.random() * spread)); },
+    openAll(rate) { eyes.forEach(e => { e.oT = 1; if (rate) e.rate = rate; }); },
+    closeAll(rate) { eyes.forEach(e => { e.oT = 0; if (rate) e.rate = rate; }); },
+    dilate(v) { eyes.forEach(e => { e.dilT = v; }); },
+    stare() { mode = "stare"; eyes.forEach(e => { look(e, "you"); e.nextBlink = performance.now() + 60000; }); },
+    get count() { return eyes.length; },
+    get image() { return img; }
+  };
+})();
+
+/* ============================================================
+   THE ROOM ANSWERS YOU — how tense you are, your heart, and the flesh that reacts
+   ============================================================ */
+// Tension: how hard you move the mouse (or your finger), click and press keys.
+const Tension = (() => {
+  let T = 0, base = 0, on = false, lx = 0, ly = 0, lt = 0, lastSpike = 0, spikeFn = null;
+  const pointer = { x: innerWidth / 2, y: innerHeight / 2, t: -1e9 };
+  const bump = v => { if (on) T = Math.min(1, T + v); };
+  addEventListener("pointermove", e => {
+    const now = performance.now();
+    pointer.x = e.clientX; pointer.y = e.clientY; pointer.t = now;
+    if (!on) { lx = e.clientX; ly = e.clientY; lt = now; return; }
+    const dt = Math.max(8, now - lt), d = Math.hypot(e.clientX - lx, e.clientY - ly);
+    lx = e.clientX; ly = e.clientY; lt = now;
+    if (dt > 200) return;
+    const v = d / dt / (Math.max(innerWidth, innerHeight) / 1000);   // screen widths per second, roughly
+    bump(Math.min(v, 5) * 0.006);
+    if (v > 2.4 && now - lastSpike > 700) { lastSpike = now; if (spikeFn) spikeFn(Math.min(1, v / 5)); }
+  }, { passive: true });
+  addEventListener("pointerdown", () => {
+    if (!on) return;
+    bump(0.12);
+    const now = performance.now();
+    if (now - lastSpike > 400) { lastSpike = now; if (spikeFn) spikeFn(0.8); }
+  }, { passive: true });
+  addEventListener("keydown", () => bump(0.05));
+  setInterval(() => { if (on) T = Math.max(base, T - 0.012); }, 50);   // you calm down when you keep still
+  return {
+    get value() { return on ? T : 0; },
+    pointer,
+    start() { on = true; },
+    stop() { on = false; T = 0; base = 0; spikeFn = null; },
+    setBase(b) { base = b; T = Math.max(T, b); },
+    onSpike(f) { spikeFn = f; },
+    bump
+  };
+})();
+
+// Your heart: faster the tenser you are. Everything that moves with it listens here.
+const Heart = (() => {
+  let on = false, timer = null, vol = 0.4;
+  const fns = [];
+  function beat() {
+    if (!on) return;
+    const T = Tension.value, gap = 60000 / (62 + 108 * T);
+    if (Sound.ctx) {
+      const t = Sound.ctx.currentTime + 0.02;
+      Sound.thump(t, 0.85 * vol); Sound.thump(t + Math.min(0.24, gap / 1000 * 0.3), 0.55 * vol);
+    }
+    fns.forEach(f => f(gap, T));
+    timer = setTimeout(beat, gap);
+  }
+  return {
+    start(v) { vol = v; if (on) return; on = true; beat(); },
+    stop() { on = false; clearTimeout(timer); },
+    volume(v) { vol = v; },
+    on(f) { fns.push(f); },
+    get running() { return on; }
+  };
+})();
+
+// The model itself: hands that twitch and reach, guts that swell, his chest that breathes.
+const Room = (() => {
+  const WORMIES = [9604, 9621, 9635, 9649, 9663, 9677, 9691, 9705, 9719];   // the intestines on the floor
+  const TORSO = [9376, 9505, 9519, 9533], TORSO_Y = 284.421, FLOOR_LOCAL = 137;
+  // every hand in the mound is the same arm: where it leaves the flesh, and its fingertips (metres, along its own axes)
+  const ARM_BASE = [-0.64, 0.37, -0.02], ARM_TIP = [-1.11, -0.06, 0.21];
+  let api = null, hands = [], reach = [], reachP = 0, reachOn = false, breathOn = false, breathAmp = 0, breathAmpT = 0.04,
+    lastBeat = 0, beatGap = 900, gutOn = false, gutAmp = 0, timer = null, pulse = 0;
+  const mul = (A, B) => { const o = new Array(16); for (let c = 0; c < 4; c++) for (let r = 0; r < 4; r++) { let s = 0; for (let k = 0; k < 4; k++) s += A[k * 4 + r] * B[c * 4 + k]; o[c * 4 + r] = s; } return o; };
+  const rotX = a => { const c = Math.cos(a), s = Math.sin(a); return [1, 0, 0, 0, 0, c, s, 0, 0, -s, c, 0, 0, 0, 0, 1]; };
+  const rotZ = a => { const c = Math.cos(a), s = Math.sin(a); return [c, s, 0, 0, -s, c, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1]; };
+  const swellM = s => [1, 0, 0, 0, 0, s, 0, 0, 0, 0, 1, 0, 0, FLOOR_LOCAL * (1 - s), 0, 1];     // thicker, still lying on the floor
+  const torsoM = s => [s, 0, 0, 0, 0, 1, 0, 0, 0, 0, s, 0, 0, TORSO_Y, 0, 1];                   // wider around his own axis
+  const toArr = m => Array.isArray(m) ? m.slice() : Object.keys(m).sort((a, b) => a - b).map(k => +m[k]);
+  const set = (id, m) => { if (api) try { api.setMatrix(id, m); } catch (e) {} };
+  const call = fn => new Promise(res => {
+    const to = setTimeout(() => res(null), 4000);
+    try { fn((e, r) => { clearTimeout(to); res(e ? null : r); }); } catch (e) { clearTimeout(to); res(null); }
+  });
+  function armFrame(h) {   // the arm's base in the room, and its own axes
+    const W = h.W, cols = [0, 1, 2].map(i => [W[i * 4], W[i * 4 + 1], W[i * 4 + 2]]), sc = cols.map(c => Math.hypot(c[0], c[1], c[2]) || 1);
+    const ax = cols.map(V3.norm), piv = [W[12], W[13], W[14]];
+    const base = V3.add(piv, V3.add(V3.add(V3.mul(ax[0], ARM_BASE[0]), V3.mul(ax[1], ARM_BASE[1])), V3.mul(ax[2], ARM_BASE[2])));
+    return { ax, base, Bl: ARM_BASE.map((v, i) => v / sc[i]), u: V3.norm(V3.sub(ARM_TIP, ARM_BASE)), len: Math.hypot(...V3.sub(ARM_TIP, ARM_BASE)) };
+  }
+  // turn the arm (by fraction f) towards T and stretch it k times its length, about the point where it leaves the flesh;
+  // it swells a little as it stretches, so it still reads as an arm and catches the light
+  function armMatrix(h, fr, T, f, k) {
+    const d = V3.sub(T, fr.base), dl = V3.norm(fr.ax.map(a => V3.dot(a, d))), u = fr.u;
+    let axis = V3.cross(u, dl); const sn = Math.hypot(...axis), ang = Math.atan2(sn, V3.dot(u, dl)) * f;
+    axis = sn > 1e-6 ? V3.mul(axis, 1 / sn) : [1, 0, 0];
+    const c = Math.cos(ang), s = Math.sin(ang), t = 1 - c, [x, y, z] = axis;
+    const R = [[c + x * x * t, x * y * t - z * s, x * z * t + y * s], [y * x * t + z * s, c + y * y * t, y * z * t - x * s], [z * x * t - y * s, z * y * t + x * s, c + z * z * t]];
+    const kp = Math.pow(k, 0.35), S = [0, 1, 2].map(i => [0, 1, 2].map(j => (i === j ? kp : 0) + (k - kp) * u[i] * u[j]));
+    const M = [0, 1, 2].map(i => [0, 1, 2].map(j => R[i][0] * S[0][j] + R[i][1] * S[1][j] + R[i][2] * S[2][j]));
+    const B = fr.Bl, tr = [0, 1, 2].map(i => B[i] - (M[i][0] * B[0] + M[i][1] * B[1] + M[i][2] * B[2]));
+    return mul(h.L, [M[0][0], M[1][0], M[2][0], 0, M[0][1], M[1][1], M[2][1], 0, M[0][2], M[1][2], M[2][2], 0, tr[0], tr[1], tr[2], 1]);
+  }
+  function tick() {
+    const now = performance.now();
+    pulse *= 0.8;
+    if (breathOn || breathAmp > 0) {
+      breathAmp += ((breathOn ? breathAmpT : 0) - breathAmp) * 0.25;
+      if (!breathOn && breathAmp < 0.002) breathAmp = 0;
+      const ph = Math.min(1, (now - lastBeat) / beatGap);
+      const s = 1 + breathAmp * (0.5 - 0.5 * Math.cos(2 * Math.PI * ph));   // in and out once per beat of your heart
+      TORSO.forEach(id => set(id, torsoM(s)));
+    }
+    if (gutOn) WORMIES.forEach((id, i) => { const w = Math.max(0, Math.sin(now / 1000 * 2.1 - i * 1.7)); set(id, swellM(1 + gutAmp * w * w)); });
+    if (reachOn) {
+      const t = now / 1000;
+      reach.forEach((r, i) => {
+        const q = clamp01((reachP - r.d) / (1 - r.d));
+        if (q <= 0 && r.q0 === 0) return;
+        r.q0 = q;
+        const e = q * q * (3 - 2 * q), f = smooth(0, 0.35, q);
+        const k = 1 + (r.k - 1) * e * (1 + 0.04 * pulse);
+        const sway = 0.06 * (1 - e * 0.7);   // the fingers feel about as they come
+        const T = [r.T[0] + Math.sin(t * 1.3 + i) * sway, r.T[1] + Math.cos(t * 1.1 + i * 2) * sway, r.T[2] + Math.sin(t * 0.9 + i * 3) * sway * 0.6];
+        set(r.h.id, armMatrix(r.h, r.fr, T, f, k));
+      });
+    }
+    if (!breathOn && !breathAmp && !gutOn && !reachOn) { clearInterval(timer); timer = null; }
+  }
+  const run = () => { if (!timer) timer = setInterval(tick, 80); };
+  return {
+    async init(a) {
+      api = a;
+      const map = await call(cb => api.getNodeMap(cb));
+      if (!map) return;
+      const ids = Object.values(map).filter(n => n && n.type === "MatrixTransform" && /male_hand/i.test(n.name || "")).map(n => n.instanceID);
+      ids.sort(() => Math.random() - 0.5);
+      for (const id of ids) {
+        const m = await call(cb => api.getMatrix(id, cb));
+        if (m && m.local && m.world) hands.push({ id, L: toArr(m.local), W: toArr(m.world), busy: false });
+      }
+    },
+    twitch(n, deg) {   // a few of the hands in the mound jerk towards you
+      const free = hands.filter(h => !h.busy);
+      for (let i = 0; i < n && free.length; i++) {
+        const h = free.splice(Math.random() * free.length | 0, 1)[0];
+        const R = Math.random() < 0.5 ? rotX : rotZ, a = (Math.random() < 0.5 ? -1 : 1) * deg * rand(0.6, 1.2) * Math.PI / 180;
+        h.busy = true;
+        [[0, 1], [130, -0.45], [290, 0.2], [480, -0.06], [640, 0]].forEach(([t, k]) =>
+          setTimeout(() => { if (h.reaching) return; set(h.id, k ? mul(h.L, R(a * k)) : h.L); if (!k) h.busy = false; }, t + i * 70));
+      }
+    },
+    flinch() {         // every intestine tightens at once
+      if (gutOn) return;
+      [[0, 1.16], [120, 1.22], [320, 1.08], [560, 1]].forEach(([t, s]) => setTimeout(() => { if (!gutOn) WORMIES.forEach(id => set(id, swellM(s))); }, t));
+    },
+    // the arms in the mound will reach for these points: him first, then you
+    prepareReach(toHim, toYou) {
+      reach = [];
+      const pool = hands.filter(h => !h.reaching).slice();
+      pool.sort(() => Math.random() - 0.5);
+      const take = (T, d) => { const h = pool.pop(); if (!h) return; h.reaching = true; h.busy = true; const fr = armFrame(h); reach.push({ h, fr, T, d, q0: 0, k: Math.max(1, Math.hypot(...V3.sub(T, fr.base)) / fr.len) }); };
+      toHim.forEach((T, i) => take(T, (i / toHim.length) * 0.3));
+      toYou.forEach((T, i) => take(T, 0.38 + (i / toYou.length) * 0.3));
+      return reach.length;
+    },
+    reachTo(p) { reachP = p; if (!reachOn) { reachOn = true; run(); } },
+    get canReach() { return hands.length > 0; },
+    gut(on, amp = 0.2) { gutOn = on; gutAmp = amp; if (on) run(); else WORMIES.forEach(id => set(id, swellM(1))); },
+    breathe(on) { breathOn = on; if (on) run(); },
+    beat(gap, T) { lastBeat = performance.now(); beatGap = gap; breathAmpT = 0.035 + 0.06 * T; pulse = 1; },
+    reset() {
+      breathOn = false; gutOn = false; reachOn = false; breathAmp = 0; reach = []; reachP = 0;
+      TORSO.forEach(id => set(id, torsoM(1))); WORMIES.forEach(id => set(id, swellM(1)));
+      hands.forEach(h => { set(h.id, h.L); h.busy = false; h.reaching = false; });
+    }
+  };
+})();
+Heart.on((gap, T) => Room.beat(gap, T));
+
+// A heart monitor: yours.
+const ECG = (() => {
+  const c = els.ecg, ctx = c.getContext("2d"), W = 240, H = 56;
+  let on = false, x = 0, lastY = H * 0.62, last = 0, beatAt = -1e9, flat = false;
+  const dpr = Math.min(devicePixelRatio || 1, 2);
+  c.width = W * dpr; c.height = H * dpr; ctx.scale(dpr, dpr);
+  Heart.on(() => { beatAt = performance.now(); });
+  function wave(dt) {   // a heartbeat, in milliseconds after the beat
+    if (flat) return 0;
+    if (dt < 0) return 0;
+    if (dt < 40) return -0.12 * Math.sin(dt / 40 * Math.PI);
+    if (dt < 110) return Math.sin((dt - 40) / 70 * Math.PI) * 1.0;
+    if (dt < 160) return -0.35 * Math.sin((dt - 110) / 50 * Math.PI);
+    if (dt > 260 && dt < 420) return 0.18 * Math.sin((dt - 260) / 160 * Math.PI);
+    return 0;
+  }
+  function frame(now) {
+    if (!on) return;
+    const dt = Math.min(64, now - last); last = now;
+    const step = dt * 0.09;
+    const y = H * 0.62 - wave(now - beatAt) * H * 0.5 + (Math.random() - 0.5) * 0.8;
+    ctx.clearRect(x + 1, 0, 14, H);
+    ctx.strokeStyle = "rgba(224,27,36,.9)"; ctx.lineWidth = 1.6; ctx.lineJoin = "round";
+    ctx.shadowColor = "rgba(224,27,36,.7)"; ctx.shadowBlur = 6;
+    ctx.beginPath(); ctx.moveTo(x, lastY); x += step; ctx.lineTo(x, y); ctx.stroke();
+    lastY = y;
+    if (x > W) { x = 0; ctx.clearRect(0, 0, 14, H); }
+    requestAnimationFrame(frame);
+  }
+  return {
+    show() { if (on) return; on = true; flat = false; c.hidden = false; ctx.clearRect(0, 0, W, H); x = 0; last = performance.now(); requestAnimationFrame(frame); requestAnimationFrame(() => c.classList.add("show")); },
+    flat() { flat = true; },
+    hide() { c.classList.remove("show"); setTimeout(() => { on = false; c.hidden = true; }, 1300); }
+  };
+})();
+
+/* ============================================================
+   THINGS YOU FIND — a carving, a broken tile, a photograph
+   ============================================================ */
+function todayCaption() { const d = new Date(); return `${d.getDate()} · ${d.getMonth() + 1} · 20771`; }   // the year is not a mistake
+function paintRealRoom(x, w, h) {   // the room from the Good End: warm, and morning light through blinds
+  const g = x.createRadialGradient(w * 0.72, h * 0.28, 0, w * 0.72, h * 0.28, Math.max(w, h) * 0.95);
+  g.addColorStop(0, "#f7ead2"); g.addColorStop(0.45, "#d9c29d"); g.addColorStop(0.8, "#b49773"); g.addColorStop(1, "#86694c");
+  x.fillStyle = g; x.fillRect(0, 0, w, h);
+  const b = document.createElement("canvas"); b.width = w; b.height = h; const bx = b.getContext("2d");
+  bx.translate(w * 0.64, h * 0.34); bx.rotate(-14 * Math.PI / 180); bx.transform(1, 0, Math.tan(-10 * Math.PI / 180), 1, 0, 0);
+  bx.fillStyle = "rgba(255,249,232,.95)";
+  for (let i = -6; i < 7; i++) bx.fillRect(-w * 0.36, i * h * 0.082, w * 0.72, h * 0.048);
+  bx.setTransform(1, 0, 0, 1, 0, 0);
+  bx.globalCompositeOperation = "destination-in";
+  const fade = bx.createLinearGradient(w * 0.2, 0, w * 1.05, 0);
+  fade.addColorStop(0, "rgba(0,0,0,0)"); fade.addColorStop(0.3, "rgba(0,0,0,1)"); fade.addColorStop(0.75, "rgba(0,0,0,1)"); fade.addColorStop(1, "rgba(0,0,0,0)");
+  bx.fillStyle = fade; bx.fillRect(0, 0, w, h);
+  x.save(); x.globalAlpha = 0.85; try { x.filter = "blur(1px)"; } catch (e) {} x.drawImage(b, 0, 0); x.restore();
+  x.fillStyle = "rgba(120,86,56,.3)"; x.beginPath(); x.ellipse(w * 0.22, h * 1.04, w * 0.55, h * 0.27, -0.08, 0, Math.PI * 2); x.fill();   // the edge of a bed, in shadow
+  const v = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.32, w / 2, h / 2, Math.max(w, h) * 0.78);
+  v.addColorStop(0, "rgba(90,60,30,0)"); v.addColorStop(1, "rgba(90,60,30,.5)");
+  x.fillStyle = v; x.fillRect(0, 0, w, h);
+}
+function makePolaroid(paint, caption) {
+  const W = 300, H = 360, c = document.createElement("canvas"); c.width = W; c.height = H;
+  const x = c.getContext("2d");
+  x.fillStyle = "#efeadd"; x.fillRect(0, 0, W, H);
+  const p = document.createElement("canvas"); p.width = 264; p.height = 264;
+  paint(p.getContext("2d"), 264, 264);
+  x.drawImage(p, 18, 18);
+  const sheen = x.createLinearGradient(18, 18, 282, 282);   // instant film: washed out at one corner
+  sheen.addColorStop(0, "rgba(255,255,255,.16)"); sheen.addColorStop(0.5, "rgba(255,255,255,0)"); sheen.addColorStop(1, "rgba(60,40,20,.12)");
+  x.fillStyle = sheen; x.fillRect(18, 18, 264, 264);
+  x.strokeStyle = "rgba(0,0,0,.18)"; x.strokeRect(18.5, 18.5, 263, 263);
+  for (let i = 0; i < 26; i++) { x.fillStyle = `rgba(90,70,40,${(Math.random() * 0.08).toFixed(3)})`; x.beginPath(); x.arc(Math.random() * W, Math.random() * H, Math.random() * 3 + 0.5, 0, 7); x.fill(); }
+  x.save(); x.translate(W / 2, 326); x.rotate(-0.025);
+  x.font = "italic 25px 'IM Fell English', Georgia, serif"; x.fillStyle = "#2a241d"; x.textAlign = "center"; x.textBaseline = "middle";
+  x.fillText(caption, 0, 0);
+  x.restore();
+  return c;
+}
+let realPhoto = null, dreamPhoto = null;
+const getRealPhoto = () => realPhoto || (realPhoto = makePolaroid(paintRealRoom, todayCaption()));
+function makeDreamPhoto(img) {   // the same kind of photo, of this room, for later
+  return makePolaroid((x, w, h) => {
+    const s = Math.max(w / img.width, h / img.height) * 1.25, cx = img.width / 2, cy = img.height * 0.4;
+    x.drawImage(img, cx - w / 2 / s, cy - h / 2 / s, w / s, h / s, 0, 0, w, h);
+    x.fillStyle = "rgba(30,50,60,.18)"; x.fillRect(0, 0, w, h);
+  }, "find the truth");
+}
+function carvingTexture() {      // TRUTH, cut into the stone upside down
+  const c = document.createElement("canvas"); c.width = 480; c.height = 160;
+  const x = c.getContext("2d");
+  x.translate(240, 80); x.rotate(Math.PI);
+  x.font = "64px 'IM Fell English SC', Georgia, serif"; x.textAlign = "center"; x.textBaseline = "middle";
+  x.fillStyle = "rgba(220,212,196,.22)"; x.fillText("TRUTH", 2, 3);    // the lit lower lip of each cut
+  x.fillStyle = "rgba(6,4,4,.85)"; x.fillText("TRUTH", 0, 0);
+  x.strokeStyle = "rgba(6,4,4,.6)"; x.lineWidth = 2;
+  for (let i = 0; i < 9; i++) { x.beginPath(); const y = rand(-40, 40); x.moveTo(rand(-220, -120), y); x.lineTo(rand(120, 220), y + rand(-14, 14)); x.globalAlpha = 0.35; x.stroke(); }
+  x.globalAlpha = 1;
+  return c;
+}
+function pillarSVG() {
+  let s = 77, tally = "";
+  const rnd = () => (s = (s * 16807) % 2147483647) / 2147483647;
+  for (let k = 0; k < 34; k++) {
+    const x = 92 + rnd() * 190, y = 120 + rnd() * 390;
+    if (y > 240 && y < 360) continue;   // the word has the middle to itself
+    for (let i = 0; i < 4; i++) tally += `M${(x + i * 7).toFixed(1)} ${y.toFixed(1)} l${((rnd() - 0.5) * 3).toFixed(1)} 22 `;
+    tally += `M${(x - 4).toFixed(1)} ${(y + 17).toFixed(1)} L${(x + 27).toFixed(1)} ${(y + 4).toFixed(1)} `;
+  }
+  const sc = "font-family=\"'IM Fell English SC', Georgia, serif\"";
+  return `<svg viewBox="0 0 400 560" role="img" aria-label="A curved stone pillar covered in scratched tally marks, as if someone had been counting days. In the middle, the word TRUTH is carved upside down.">
+    <path d="M70 548 C58 400 70 240 120 130 C150 70 210 34 268 30 C318 28 342 52 336 92 C312 170 300 270 312 390 C318 460 326 510 334 548 Z" fill="#070707" stroke="${INK}" stroke-width="3"/>
+    <path d="M290 60 L276 96 L288 120 L272 160 M96 420 L120 440 L112 470" fill="none" stroke="${INK}" stroke-width="1.3" opacity=".5"/>
+    <path d="${tally}" fill="none" stroke="${INK}" stroke-width="1.6" stroke-linecap="round" opacity=".42"/>
+    <path d="M196 92 Q222 72 248 92 Q222 112 196 92 Z" fill="none" stroke="${INK}" stroke-width="2"/>
+    <rect x="220" y="80" width="4" height="24" fill="#c4141e"/>
+    <g transform="rotate(180 200 300)">
+      <text x="200" y="318" text-anchor="middle" ${sc} font-size="54" letter-spacing="5" fill="${INK}" opacity=".16">TRUTH</text>
+      <text x="200" y="318" text-anchor="middle" ${sc} font-size="54" letter-spacing="5" fill="none" stroke="${INK}" stroke-width="2.2">TRUTH</text>
+    </g>
+  </svg>`;
+}
+function floorSVG() {
+  const url = getRealPhoto().toDataURL("image/jpeg", 0.9);
+  let tiles = "";
+  for (let i = -2; i < 3; i++) for (let j = -2; j < 3; j++) {
+    const light = (i + j) & 1;
+    tiles += `<rect x="${200 + i * 150}" y="${200 + j * 150}" width="150" height="150" fill="${light ? "rgba(236,230,216,.13)" : "#070707"}" stroke="${INK}" stroke-width="1.6"/>`;
+  }
+  // the corner where four tiles meet at (200,200); the near tile has lost its corner
+  const chip = "M200 200 L262 200 L251 209 L246 222 L232 226 L226 241 L213 247 L208 262 L200 268 Z";
+  return `<svg viewBox="0 0 400 400" role="img" aria-label="Checkered floor tiles seen from above. One tile has a broken corner that opens onto darkness, and something red glints down there. An instant photo lies face up beside it.">
+    <defs><clipPath id="floorClip"><rect x="14" y="14" width="372" height="372" rx="6"/></clipPath></defs>
+    <g clip-path="url(#floorClip)"><g transform="rotate(-20 200 200)">${tiles}
+      <path d="${chip}" fill="#000" stroke="${INK}" stroke-width="2"/>
+      <circle class="glint" cx="216" cy="222" r="2.4" fill="#e01b24"/></g></g>
+    <rect x="14" y="14" width="372" height="372" rx="6" fill="none" stroke="${INK}" stroke-width="3"/>
+    <image href="${url}" x="232" y="200" width="104" height="125" transform="rotate(16 284 262)"/>
+  </svg>`;
+}
+function polaroidHTML() {
+  return `<img class="snap" src="${getRealPhoto().toDataURL("image/jpeg", 0.92)}" alt="An instant photo of a warm room with morning light falling through blinds. Handwritten underneath: ${todayCaption()}.">`;
+}
+async function swapInspect(html) {
+  els.inspect.classList.remove("show");
+  await sleep(700);
+  els.inspect.innerHTML = html;
+  requestAnimationFrame(() => requestAnimationFrame(() => els.inspect.classList.add("show")));
+  await sleep(900);
+}
+
+/* Everything that sits in the room's own space: the carving, the broken tile, the photo. And the dark closing in. */
+const WorldFx = (() => {
+  const c = els.worldFx, ctx = c.getContext("2d");
+  const show = { carving: false, floor: false, dark: false };
+  let on = false, W = 0, H = 0, dpr = 1, carveTex = null, dark = 0, glint = false;
+  function size() {
+    dpr = Math.min(devicePixelRatio || 1, 1.5); W = innerWidth; H = innerHeight;
+    const w = Math.round(W * dpr), h = Math.round(H * dpr);
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
+  }
+  function quad(img, A, B, D) {   // A top-left, B top-right, D bottom-left, already on screen
+    const iw = img.width, ih = img.height;
+    ctx.setTransform(dpr * (B.x - A.x) / iw, dpr * (B.y - A.y) / iw, dpr * (D.x - A.x) / ih, dpr * (D.y - A.y) / ih, dpr * A.x, dpr * A.y);
+    ctx.drawImage(img, 0, 0);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  function drawCarving(proj, cam) {
+    if (Math.hypot(cam.p[0] - CARVING.c[0], cam.p[1] - CARVING.c[1]) > 2.8) return;   // only once you are at the pillar
+    carveTex = carveTex || carvingTexture();
+    const { c: C, right: R, up: U, w, h } = CARVING;
+    const A = proj(V3.add(C, V3.add(V3.mul(R, -w / 2), V3.mul(U, h / 2)))), B = proj(V3.add(C, V3.add(V3.mul(R, w / 2), V3.mul(U, h / 2)))), D = proj(V3.add(C, V3.add(V3.mul(R, -w / 2), V3.mul(U, -h / 2))));
+    if (A.z < 0.1 || B.z < 0.1 || D.z < 0.1) return;
+    ctx.globalAlpha = 0.9; quad(carveTex, A, B, D); ctx.globalAlpha = 1;
+  }
+  function drawFloor(proj, cam, now) {
+    const at = tileToWorld(PHOTO_AT.u, PHOTO_AT.v);
+    if (Math.hypot(cam.p[0] - at[0], cam.p[1] - at[1]) > 3.4) return;
+    const chip = [[5, -5], [5.34, -5], [5.29, -4.96], [5.25, -4.9], [5.19, -4.88], [5.15, -4.8], [5.08, -4.78], [5.04, -4.7], [5, -4.66]]
+      .map(([u, v]) => proj(tileToWorld(u, v)));
+    if (chip.some(q => q.z < 0.1)) return;
+    ctx.beginPath(); chip.forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.closePath();
+    ctx.fillStyle = "rgba(3,2,2,.93)"; ctx.fill();
+    ctx.strokeStyle = "rgba(205,198,186,.35)"; ctx.lineWidth = 1; ctx.stroke();
+    if (glint) {   // something down there catches the light
+      const g = proj(tileToWorld(5.1, -4.9)), k = 0.5 + 0.5 * Math.sin(now / 380);
+      ctx.fillStyle = `rgba(224,27,36,${(0.25 + 0.75 * k * k).toFixed(3)})`;
+      ctx.beginPath(); ctx.arc(g.x, g.y, Math.max(1.2, 0.006 * g.s), 0, 7); ctx.fill();
+    }
+    const c0 = Math.cos(TILE.th), s0 = Math.sin(TILE.th), cr = Math.cos(PHOTO_AT.rot), sr = Math.sin(PHOTO_AT.rot);
+    const A2 = [c0 * cr + -s0 * sr, s0 * cr + c0 * sr, 0], B2 = [-c0 * sr + -s0 * cr, -s0 * sr + c0 * cr, 0];   // the photo's own axes on the floor
+    const w = PHOTO_AT.w, h = PHOTO_AT.h, lift = [0, 0, 0.004];
+    const P = (i, j) => proj(V3.add(V3.add(at, lift), V3.add(V3.mul(A2, i * w / 2), V3.mul(B2, j * h / 2))));
+    const TL = P(-1, 1), TR = P(1, 1), BL = P(-1, -1), BR = P(1, -1);
+    if ([TL, TR, BL, BR].some(q => q.z < 0.1)) return;
+    ctx.fillStyle = "rgba(0,0,0,.45)";   // its shadow
+    ctx.beginPath(); [TL, TR, BR, BL].forEach((q, i) => i ? ctx.lineTo(q.x + 2, q.y + 3) : ctx.moveTo(q.x + 2, q.y + 3)); ctx.fill();
+    quad(getRealPhoto(), TL, TR, BL);
+    ctx.fillStyle = "rgba(8,12,10,.4)";   // lit as dimly as the floor it lies on
+    ctx.beginPath(); [TL, TR, BR, BL].forEach((q, i) => i ? ctx.lineTo(q.x, q.y) : ctx.moveTo(q.x, q.y)); ctx.fill();
+  }
+  function frame(now) {
+    if (!on) return;
+    requestAnimationFrame(frame);
+    size();
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.clearRect(0, 0, W, H);
+    const cam = LiveCam.get();
+    if (cam && insideApi()) {
+      const proj = makeProj(cam, W, H);
+      if (show.carving) drawCarving(proj, cam);
+      if (show.floor) drawFloor(proj, cam, now);
+    }
+    if (dark > 0.01) {
+      const g = ctx.createRadialGradient(W / 2, H / 2, Math.max(W, H) * 0.62 * (1 - dark), W / 2, H / 2, Math.max(W, H) * 0.75);
+      g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, `rgba(0,0,0,${Math.min(1, dark * 1.3).toFixed(3)})`);
+      ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+      if (dark > 0.6) { ctx.fillStyle = `rgba(0,0,0,${((dark - 0.6) * 2.2).toFixed(3)})`; ctx.fillRect(0, 0, W, H); }
+    }
+  }
+  function sync() {
+    const want = show.carving || show.floor || show.dark;
+    if (want && !on) { on = true; LiveCam.use(); c.hidden = false; requestAnimationFrame(frame); }
+    if (!want && on) { on = false; LiveCam.release(); ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, c.width, c.height); c.hidden = true; }
+  }
+  return {
+    show(k) { show[k] = true; sync(); },
+    hide(k) { show[k] = false; sync(); },
+    hideAll() { show.carving = show.floor = show.dark = false; dark = 0; glint = false; sync(); },
+    glint(v) { glint = v; },
+    dark(v) { dark = v; show.dark = v > 0; sync(); }
+  };
+})();
+
+/* ============================================================
+   FLESH — look closely at the guts and they move. A still of the room is laid over
+   the live view and warped where the guts are, in waves that crawl towards you.
+   ============================================================ */
+const FleshWarp = (() => {
+  const c = els.warp;
+  let gl = null, prog = null, tImg = null, tMask = null, on = false, amp = 0, a0 = 0, a1 = 0, at0 = 0, adur = 1, t0 = 0, U = {}, mw = 1, mh = 1;
+  const VS = "attribute vec2 p; varying vec2 vUv; void main(){ vUv = p * 0.5 + 0.5; gl_Position = vec4(p, 0.0, 1.0); }";
+  const FS = `precision mediump float;
+    uniform sampler2D uImg, uMask; uniform vec2 uTexel; uniform float uTime, uAmp; varying vec2 vUv;
+    float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
+    float noise(vec2 p){ vec2 i = floor(p), f = fract(p); f = f * f * (3.0 - 2.0 * f);
+      return mix(mix(hash(i), hash(i + vec2(1.0, 0.0)), f.x), mix(hash(i + vec2(0.0, 1.0)), hash(i + vec2(1.0, 1.0)), f.x), f.y); }
+    void main(){
+      vec2 uv = vUv;
+      float m = texture2D(uMask, uv).r;
+      vec2 g = vec2(texture2D(uMask, uv + vec2(uTexel.x, 0.0)).r - texture2D(uMask, uv - vec2(uTexel.x, 0.0)).r,
+                    texture2D(uMask, uv + vec2(0.0, uTexel.y)).r - texture2D(uMask, uv - vec2(0.0, uTexel.y)).r);
+      float ph = uTime * 2.3 + uv.y * 7.0 - noise(uv * 3.5) * 9.0 - noise(uv * 9.0) * 2.0;   // crests crawl down the screen, towards you
+      float w = sin(ph);
+      vec2 off = g * (w * 0.024 * uAmp) + vec2(-g.y, g.x) * (cos(ph) * 0.011 * uAmp);
+      off += m * (vec2(noise(uv * 7.0 + uTime * 0.35), noise(uv * 7.0 - uTime * 0.35 + 7.0)) - 0.5) * 0.005 * uAmp;
+      vec3 col = texture2D(uImg, uv + off).rgb;
+      col *= 1.0 + m * uAmp * (0.1 * w + 0.03);
+      gl_FragColor = vec4(col, 1.0);
+    }`;
+  function init() {
+    try { gl = c.getContext("webgl", { alpha: false, antialias: false, preserveDrawingBuffer: false }); } catch (e) { gl = null; }
+    if (!gl) return false;
+    const sh = (t, s) => { const o = gl.createShader(t); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.warn(gl.getShaderInfoLog(o)); return o; };
+    prog = gl.createProgram();
+    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS)); gl.linkProgram(prog);
+    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) { gl = null; return false; }
+    gl.useProgram(prog);
+    const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
+    const loc = gl.getAttribLocation(prog, "p"); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
+    ["uImg", "uMask", "uTexel", "uTime", "uAmp"].forEach(n => { U[n] = gl.getUniformLocation(prog, n); });
+    const tex = () => { const t = gl.createTexture(); gl.bindTexture(gl.TEXTURE_2D, t);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE); gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE); return t; };
+    tImg = tex(); tMask = tex();
+    return true;
+  }
+  const FLESH = { Wormie_Mat: 1, Mound_Mat: 0.55, HandsWhite_Mat: 0.45, HandsBrown_Mat: 0.45, HandsBlack_Mat: 0.45 };
+  async function pickMask(api, W, H, step) {   // which parts of the picture are flesh, asked of the model itself
+    const cols = Math.ceil(W / step), rows = Math.ceil(H / step), m = new Float32Array(cols * rows), t0 = performance.now();
+    let named = 0, flesh = 0;
+    const jobs = []; for (let j = 0; j < rows; j++) for (let i = 0; i < cols; i++) jobs.push([i, j]);
+    for (let k = 0; k < jobs.length && performance.now() - t0 < 5000; k += 48) {
+      await Promise.all(jobs.slice(k, k + 48).map(([i, j]) => vPickInfo(api, (i + 0.5) * step, (j + 0.5) * step).then(r => {
+        if (!r || !r.mat) return; named++; const v = FLESH[r.mat] || 0; if (v) flesh++; m[j * cols + i] = v;
+      })));
+    }
+    return named > 20 && flesh > 6 ? { m, cols, rows, step } : null;
+  }
+  function colorMask(img, cols, rows) {   // and which look like it: red, not grey
+    const cv = document.createElement("canvas"); cv.width = cols; cv.height = rows;
+    const x = cv.getContext("2d", { willReadFrequently: true }); x.drawImage(img, 0, 0, cols, rows);
+    const d = x.getImageData(0, 0, cols, rows).data, m = new Float32Array(cols * rows);
+    for (let i = 0; i < cols * rows; i++) {
+      const r = d[i * 4], g = d[i * 4 + 1], b = d[i * 4 + 2];
+      m[i] = clamp01((r - 0.5 * (g + b) - 6) / 40) * clamp01((r + g + b) / 3 / 35);
+    }
+    return m;
+  }
+  function blur(m, w, h, passes) {
+    const t = new Float32Array(m.length);
+    for (let p = 0; p < passes; p++) {
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, n = 0; for (let k = -2; k <= 2; k++) { const xx = x + k; if (xx >= 0 && xx < w) { s += m[y * w + xx]; n++; } } t[y * w + x] = s / n; }
+      for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) { let s = 0, n = 0; for (let k = -2; k <= 2; k++) { const yy = y + k; if (yy >= 0 && yy < h) { s += t[yy * w + x]; n++; } } m[y * w + x] = s / n; }
+    }
+    return m;
+  }
+  function frame(now) {
+    if (!on) return;
+    requestAnimationFrame(frame);
+    const k = clamp01((now - at0) / adur); amp = a0 + (a1 - a0) * (k * k * (3 - 2 * k));
+    gl.uniform1f(U.uTime, (now - t0) / 1000); gl.uniform1f(U.uAmp, amp);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  }
+  return {
+    async setup(api) {
+      if (!gl && !init()) return false;
+      const W = innerWidth, H = innerHeight, img = await freshVShot(api);
+      if (!img) return false;
+      mw = Math.ceil(W / 8); mh = Math.ceil(H / 8);
+      const cm = colorMask(img, mw, mh), pm = await pickMask(api, W, H, 24), m = new Float32Array(mw * mh);
+      for (let j = 0; j < mh; j++) for (let i = 0; i < mw; i++) {
+        let v = cm[j * mw + i];
+        if (pm) {   // the model's answer, smoothly, trimmed by colour
+          const fx = Math.max(0, Math.min(pm.cols - 1.001, (i + 0.5) * 8 / pm.step - 0.5)), fy = Math.max(0, Math.min(pm.rows - 1.001, (j + 0.5) * 8 / pm.step - 0.5));
+          const x0 = Math.floor(fx), y0 = Math.floor(fy), ax = fx - x0, ay = fy - y0, M = (x, y) => pm.m[y * pm.cols + x];
+          const p = (M(x0, y0) * (1 - ax) + M(x0 + 1, y0) * ax) * (1 - ay) + (M(x0, y0 + 1) * (1 - ax) + M(x0 + 1, y0 + 1) * ax) * ay;
+          v = p * (0.35 + 0.65 * v);
+        }
+        m[j * mw + i] = v;
+      }
+      blur(m, mw, mh, 2);
+      const bytes = new Uint8Array(mw * mh); for (let i = 0; i < bytes.length; i++) bytes[i] = Math.round(clamp01(m[i] * 1.6) * 255);
+      c.width = W; c.height = H; gl.viewport(0, 0, W, H);
+      gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true); gl.pixelStorei(gl.UNPACK_ALIGNMENT, 1);
+      gl.activeTexture(gl.TEXTURE0); gl.bindTexture(gl.TEXTURE_2D, tImg); gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, gl.RGB, gl.UNSIGNED_BYTE, img);
+      gl.activeTexture(gl.TEXTURE1); gl.bindTexture(gl.TEXTURE_2D, tMask); gl.texImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, mw, mh, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, bytes);
+      gl.uniform1i(U.uImg, 0); gl.uniform1i(U.uMask, 1); gl.uniform2f(U.uTexel, 1.5 / mw, 1.5 / mh);
+      return true;
+    },
+    show() { if (!gl) return; on = true; t0 = at0 = performance.now(); a0 = a1 = amp = 0; c.hidden = false; requestAnimationFrame(frame); },
+    ramp(to, ms) { a0 = amp; a1 = to; at0 = performance.now(); adur = Math.max(1, ms); },
+    hide() { on = false; c.hidden = true; }
+  };
+})();
+
+async function enterBuilding() {
+  els.dialog.classList.add("dim");
+  await sleep(900);
+  await clearLine(false);
+  Sound.creak(); Sound.breath(false); Sound.heartbeat(false);
+  View.to({ z: 71, zoom: 1.3 }, 1.8, "in");
+  Music.stop(1.8);
+  await blackTo(1, 1600);
+  FogGL.off();
+  Yard.show(false); Eyes.show(false); Giant.show(false);
+  View.bgFade = 0;
+  startViscera();
+  els.vViscera.classList.add("here");   // on screen (still transparent) so it can finish loading
+  if (!visceraApi) {
+    Loader.show(() => visceraProgress > 0 ? "Loading " + Math.round(visceraProgress * 100) + "%" : "Loading");
+    try { await withTimeout(visceraP, 120000); } catch (e) { console.warn(e); }
+    Loader.hide();
+  }
+  if (!visceraApi) { showEnd("fail"); return; }
+  Music.play("inside", 7);                // the music inside the house
+  els.vHouse.src = "about:blank";   // the house is behind you now; free its graphics memory
+  els.vViscera.style.opacity = "1";
+  const api = insideApi();
+  if (api) Room.init(api);
+  LiveCam.target(VISCERA_CAM, 0);
+  FX.jump({ blur: 10, bright: 1.35, sway: 0.5 }); FX.swayT = 0.1; FX.blurRate = 0.55;
+  lidsTo(1, 1);
+  await sleep(200);
+  await blackTo(0, 400);
+  Sound.heartbeat(true, 820, 1.03);
+  FX.blurT = 0; FX.brightT = 1;
+  await lidsAnim([[0, 1], [0.3, 0.5], [0.42, 0.85], [0.65, 0.18], [0.76, 0.3], [1, 0]], 5200);
+  await sleep(900);
+  Sound.heartbeat(false);
+  FX.blurRate = 2.5;
+  return theRoom();
+}
+
+let pulseTimer = null;
+function heartPulse(on, gap = 900) {      // the room swells a little with each beat of your heart
+  clearInterval(pulseTimer);
+  if (!on || REDUCED) return;
+  pulseTimer = setInterval(() => { FX.scale += 0.012; setTimeout(() => { FX.scale += 0.007; }, 240); }, gap);
+}
+let heartShakes = 0;   // how hard each of your heartbeats knocks the room about
+Heart.on(() => { if (heartShakes && !REDUCED) { FX.scale += 0.006 * heartShakes; setTimeout(() => { FX.scale += 0.004 * heartShakes; }, 220); } });
+
+async function openWallEyes(shot, n, quick) {
+  const api = insideApi();
+  if (!api) return false;
+  const q = projectShot(HEAD, shot);
+  WallEyes.setTarget(q.x, q.y - innerHeight * 0.08);
+  if (!await WallEyes.setupWalls(api, shot, n)) return false;
+  WallEyes.start();
+  if (quick) WallEyes.openAll(1.4); else WallEyes.openOneByOne(1100);
+  return true;
+}
+async function shutWallEyes() { WallEyes.closeAll(1.4); await sleep(750); WallEyes.stop(); }
+// the eyes in the walls follow your hand to whichever answer you are about to give
+function choiceWithEyes(list, gaze) {
+  const pick = choose(list);
+  els.choices.querySelectorAll("button").forEach((b, i) => {
+    const how = gaze[list[i][0]];
+    if (!how) return;
+    const on = () => WallEyes.focus(how), off = () => WallEyes.focus(null);
+    b.addEventListener("pointerenter", on); b.addEventListener("focus", on);
+    b.addEventListener("pointerleave", off); b.addEventListener("blur", off);
+  });
+  return pick;
+}
+
+async function theRoom() {
+  Tension.start(); Tension.setBase(0.05);
+  Tension.onSpike(k => {   // move suddenly and the room flinches with you
+    Room.twitch(1 + Math.round(k * 3), 6 + 8 * k);
+    if (k > 0.5) Room.flinch();
+    Sound.wet(0.25 + 0.5 * k);
+  });
+  Heart.start(0.28);
+  // the first thing you see is flesh: a mound of it, full of hands
+  await sleep(500);
+  Sound.wet(0.5); Room.twitch(3, 8);
+  await vcamTo(SHOT_FLESH, 5.5);
+  await sleep(900);
+  Room.twitch(7, 12); Sound.wet(0.9);        // they know you're here
+  await sleep(2200);
+  // something drips on you from above
+  Sound.drip(); await sleep(1500); Sound.drip(); await sleep(900);
+  Sound.rope();
+  await vcamTo(SHOT_UP, 5.2);                 // and you look up. Someone hangs there, upside down.
+  Heart.volume(0.42); Tension.setBase(0.12);
+  Sound.rope();
+  if (await openWallEyes(SHOT_UP, 11) && WallEyes.image) dreamPhoto = makeDreamPhoto(WallEyes.image);
+  await sleep(5200);
+  await say("Is he… the dreamer?", "thought");
+  await sleep(2200);
+  await clearLine();
+  return explore();
+}
+
+async function explore() {
+  const seen = { left: false, right: false };
+  for (;;) {
+    const opts = [];
+    if (!seen.left) opts.push(["left", "go left"]);
+    if (!seen.right) opts.push(["right", "go right"]);
+    if (seen.left || seen.right) opts.push(["guts", "watch the intestines"], ["him", "look up at him"]);
+    const c = await choiceWithEyes(opts, { left: "left", right: "right", guts: "down", him: "him" });
+    if (c === "left") { await goLeft(); seen.left = true; }
+    else if (c === "right") { await goRight(); seen.right = true; }
+    else if (c === "guts") return watchGuts();
+    else return lookAtHim();
+  }
+}
+
+async function walkTo(shot, sec) {
+  FX.bobT = 0.6; FX.stepDur = 0.62;
+  await vcamTo(shot, sec);
+  FX.bobT = 0;
+}
+async function walkBack() {
+  els.dialog.classList.add("dim");
+  await walkTo(SHOT_UP, 4.4);
+  WorldFx.hide("carving"); WorldFx.hide("floor");
+  await openWallEyes(SHOT_UP, 11, true);
+  await sleep(900);
+}
+
+async function goLeft() {               // the pillar: someone counted days on it, and cut one word
+  els.dialog.classList.add("dim");
+  await shutWallEyes();
+  WorldFx.show("carving");
+  await walkTo(SHOT_LEFT, 4.4);
+  await sleep(1100);
+  await inspect(pillarSVG());
+  await sleep(700);
+  await say("TRUTH… carved upside down.", "inner");
+  await sleep(1500);
+  await choose([["back", "step back"]]);
+  closeInspect(); clearLine();
+  await walkBack();
+}
+
+async function goRight() {              // a broken tile, and a photo lying next to it
+  els.dialog.classList.add("dim");
+  await shutWallEyes();
+  WorldFx.show("floor");
+  await walkTo(SHOT_RIGHT, 4.8);
+  await sleep(900);
+  await vcamTo(SHOT_KNEEL, 2.6);         // you crouch down
+  WorldFx.glint(true);
+  await sleep(900);
+  await inspect(floorSVG());
+  await sleep(500);
+  await choose([["take", "pick up the photo"]]);
+  els.dialog.classList.add("dim");
+  await swapInspect(polaroidHTML());
+  await sleep(600);
+  await say("This room… I know this room.", "inner");
+  await sleep(1800);
+  await say("This was before I came to this damn place.", "inner");
+  await sleep(1600);
+  await choose([["back", "put it down"]]);
+  closeInspect(); clearLine(); WorldFx.glint(false);
+  await walkBack();
+}
+
+let gurgleTimer = null;
+function gurgles(on, every = 1400) {
+  clearTimeout(gurgleTimer);
+  if (!on) return;
+  (function g() { Sound.gurgle(); gurgleTimer = setTimeout(g, rand(every * 0.5, every * 1.3)); })();
+}
+
+async function watchGuts() {            // look long enough and they are moving
+  const api = insideApi();
+  els.dialog.classList.add("dim");
+  await shutWallEyes();
+  FX.bobT = 0.35; await vcamTo(SHOT_GUT, 4.2); FX.bobT = 0;
+  Heart.volume(0.55); Tension.setBase(0.22);
+  await sleep(600);
+  const warped = !!api && await FleshWarp.setup(api);
+  if (warped) { FleshWarp.show(); FleshWarp.ramp(0.45, 6000); }
+  Room.gut(!warped, 0.16);   // without the still, swell the real ones instead
+  gurgles(true, 1700);
+  await sleep(4200);
+  await say("They're… moving.", "inner");
+  await sleep(2400);
+  await clearLine();
+  if (warped) FleshWarp.ramp(1.05, 4500);
+  Room.gut(!warped, 0.3);
+  Tension.setBase(0.4); Room.twitch(6, 12); gurgles(true, 800);
+  await sleep(5200);
+  // one of them lunges at you
+  if (warped) FleshWarp.ramp(2.6, 260);
+  Sound.lunge(); FX.kick(1.1); Room.flinch(); Room.twitch(10, 16);
+  await sleep(240);
+  await blackTo(1, 80);
+  FleshWarp.hide(); Room.gut(false); gurgles(false);
+  if (api) { try { api.setCameraLookAt(SHOT_UP.p, SHOT_UP.t, 0); } catch (e) {} }
+  LiveCam.target(SHOT_UP, 0);
+  await sleep(700);
+  await openWallEyes(SHOT_UP, 13, true);
+  WallEyes.stare();                      // and when you look up, every eye is on you
+  Sound.squelch();
+  await blackTo(0, 260);
+  Tension.setBase(0.3);
+  await sleep(2600);
+  const c = await choiceWithEyes([["open", "open his eyes"], ["close", "close your eyes"]], { open: "him", close: "you" });
+  return c === "open" ? openHisEyes() : closeYourEyes();
+}
+
+function leaveRoom() {                  // stop everything that was answering you
+  Heart.stop(); Tension.stop(); Room.reset(); gurgles(false); heartShakes = 0;
+  WorldFx.hideAll(); FleshWarp.hide(); ECG.hide();
+}
+
+async function lookAtHim() {            // close enough to touch him. Then the hands come up out of the flesh for you both.
+  const api = insideApi();
+  els.dialog.classList.add("dim");
+  await shutWallEyes();
+  Heart.volume(0.8); heartShakes = 1; Tension.setBase(0.12);
+  Room.breathe(true);                    // his chest rises and falls with your heart
+  Sound.rope();
+  FX.swayT = 0.2;                        // you rise up to him, as you only can in a dream
+  await vcamTo(SHOT_NEAR, 6.5);
+  FX.swayT = 0.1;
+  await sleep(1800);
+  await say("His chest… it moves with my heartbeat.", "inner");
+  ECG.show();
+  await sleep(2800);
+  await clearLine();
+  Room.twitch(14, 16); Sound.wet(0.9); FX.kick(0.25);   // something moves, far below
+  await sleep(800);
+  await vcamTo(SHOT_DOWN, 3.4);          // you look down
+  const C = SHOT_WRAP.p, V = V3.norm(V3.sub(SHOT_WRAP.t, C)), rt = V3.norm(V3.cross(V, [0, 0, 1])), upv = V3.cross(rt, V);
+  const toHim = Array.from({ length: 16 }, (_, i) => {
+    if (i < 3) return V3.add(HEAD, [rand(-0.08, 0.08), rand(-0.12, 0.04), rand(-0.1, 0.05)]);
+    const a = i / 16 * Math.PI * 2 + rand(-0.2, 0.2), r = rand(0.13, 0.19);
+    return [BODY_AXIS[0] + Math.cos(a) * r, BODY_AXIS[1] + Math.sin(a) * r, rand(5.8, 6.9)];
+  });
+  const toYou = Array.from({ length: 12 }, () => V3.add(C, V3.add(V3.add(V3.mul(rt, rand(-0.42, 0.42)), V3.mul(upv, rand(-0.4, 0.15))), V3.mul(V, rand(0.12, 0.34)))));
+  if (api && Room.canReach) Room.prepareReach(toHim, toYou);
+  Sound.grow(4);
+  let p = 0, last = performance.now(), nextGrow = last + 3500, lookedUp = false, said = false;
+  while (p < 1) {
+    const now = performance.now(), dt = Math.min(0.1, (now - last) / 1000); last = now;
+    p = Math.min(1, p + dt * (0.028 + 0.07 * Tension.value));   // the more scared you are, the faster they come
+    Room.reachTo(p);
+    Tension.setBase(0.15 + 0.5 * p);
+    if (!said && p > 0.06) { said = true; say("Calm down… calm down…", "inner").then(() => sleep(2400)).then(() => clearLine()); }
+    if (!lookedUp && p > 0.42) { lookedUp = true; vcamTo(SHOT_WRAP, 3.6); }   // back up at him, as they take hold of him
+    if (p > 0.55) { const k = smooth(0.55, 1, p); WorldFx.dark(k * 0.96); FX.tiltT = 14 * k; FX.swayT = 0.1 + 0.4 * k; }
+    if (now > nextGrow) { Sound.grow(3); if (Math.random() < 0.6) Sound.wet(0.6); nextGrow = now + rand(2200, 4200); }
+    await sleep(40);
+  }
+  // then nothing
+  Music.stop(0.3);
+  Heart.stop(); ECG.flat(); Room.breathe(false);
+  Sound.droneTo(0.0001, 0.3); Sound.tinnitus(4);
+  await blackTo(1, 500);
+  await sleep(1400);
+  leaveRoom();
+  FX.jump({ tilt: 0, scale: 1.04, sway: 0 });
+  await sleep(1400);
+  return goodEnd({ fromRoom: true, photo: dreamPhoto });
+}
+
+async function openHisEyes() {
+  const api = insideApi();
+  els.dialog.classList.add("dim");
+  Heart.stop(); Tension.stop();
+  WallEyes.stare();                            // every eye in the walls turns to you
+  Sound.squelch();
+  await sleep(2200);
+  WallEyes.closeAll(1.6);
+  await sleep(900);
+  WallEyes.stop();
+  Sound.heartbeat(true, 640, 0.97); heartPulse(true, 640);
+  Sound.rope();
+  await vcamTo(SHOT_FACE, 3.8);                // up, to his wrapped face, hanging the wrong way up
+  await sleep(600);
+  if (api && await WallEyes.setupFace(api, SHOT_FACE)) {
+    WallEyes.start(); WallEyes.focus("you");
+    await sleep(1200);
+    WallEyes.openAll(0.26);                    // slowly, between the bandages
+    await sleep(4600);
+    WallEyes.dilate(1);                        // and the pupils widen, taking you in
+    await sleep(2600);
+  } else {
+    await sleep(2400);
+  }
+  // then nothing at all
+  Music.stop(0.5);
+  Sound.heartbeat(false); heartPulse(false);
+  Sound.droneTo(0.0001, 0.4);
+  await sleep(1700);
+  pulseFlash(1, 40, 1100);
+  blackTo(1, 1);
+  WallEyes.stop(); leaveRoom();
+  await sleep(2000);
+  Sound.morning();                             // somewhere, someone is waking up
+  await sleep(3200);
+  Sound.stopMorning();
+  await sleep(1000);
+  if (Sound.ctx) { const t = Sound.ctx.currentTime + 0.02; Sound.thump(t, 0.9); Sound.thump(t + 0.24, 0.6); }
+  await sleep(1400);
+  showEnd("open");
+}
+
+async function closeYourEyes() {
+  els.dialog.classList.add("dim");
+  WallEyes.focus("you");
+  Heart.stop(); Tension.stop(); Music.stop(3.5);
+  Sound.heartbeat(true, 1000, 1.06); heartPulse(false);
+  await sleep(900);
+  WallEyes.closeAll(0.5);
+  await lidsTo(1, 3400, "ease-in");
+  await sleep(1400);
+  Sound.heartbeat(false);
+  await blackTo(1, 300);
+  WallEyes.stop(); leaveRoom();
+  try { localStorage.setItem("oye-again", "1"); } catch (e) {}
+  await sleep(1600);
+  location.reload();                           // …and you wake among the graves again
+}
+
+async function goodEnd(opts = {}) {
+  els.dialog.classList.add("dim");
+  Music.stop(opts.fromRoom ? 0.3 : 4.5);
+  if (!opts.fromRoom) {
+    Sound.breath(false); Sound.heartbeat(true, 950, 1.08); Sound.droneTo(0.0001, 4);
+    FX.swayT = 0.15; FX.splitT = 0; FX.blurT = 4; FX.blurRate = 0.8;
+    FogGL.target(0.2);
+    await lidsTo(1, 3800, "ease-in");
+    await sleep(1400);
+    Sound.heartbeat(false);
+    await sleep(1600);
+  } else {
+    await lidsTo(1, 1);                        // you are already in the dark
+  }
+  // under closed eyes: the real world
+  View.bgFade = 0; Yard.show(false); FogGL.off(); Eyes.show(false); Giant.show(false);
+  els.vHouse.src = "about:blank"; els.vViscera.style.opacity = "0";
+  FX.swayT = 0; FX.blurT = 0; FX.blurRate = 2.5;
+  els.real.hidden = false;
+  document.body.classList.add("real");
+  if (opts.fromRoom) await blackTo(0, 30);
+  Sound.morning();
+  await sleep(400);
+  els.real.classList.add("focus");
+  await lidsAnim([[0, 1], [0.32, 0.55], [0.44, 0.8], [0.7, 0.2], [0.8, 0.32], [1, 0]], 4400);
+  await sleep(600);
+  await say("You're back in the real world.", "real");
+  await sleep(2200);
+  if (opts.photo) {                            // but a photo lies beside you: that room, and him
+    const k = els.keepsake;
+    k.src = opts.photo.toDataURL("image/jpeg", 0.9);
+    k.hidden = false;
+    requestAnimationFrame(() => requestAnimationFrame(() => k.classList.add("in")));
+    await sleep(2400);
+    await say("…who took this?", "real");
+    await sleep(2600);
+    showEnd("good", "You're home. Aren't you?");
+    return;
+  }
+  showEnd("good");
+}
+
+/* ============================================================
+   STORY
+   ============================================================ */
+async function story() {
+  await wake();
+  await say("where …am I??", "q");
+  await sleep(1100);
+  let c = await choose([["look", "look around"], ["enter", "go in the building"]]);
+  if (c === "enter") { await walkToDoor(); return atTheDoor(); }
+
+  await lookAround();
+  await choose([["walk", "walk around"]]);
+  await walkAround();
+  await giantReveal();
+  await chaseRun();
+
+  c = await choose([["run", "keep running"], ["tired", "so tired …"]]);
+  if (c === "tired") return soTired();
+
+  await finalStomp();
+  return atTheDoor();
+}
+
+let started = false;
+els.wake.addEventListener("click", () => {
+  if (started) return;
+  started = true;
+  story().catch(e => console.error(e));
+});
+
+/* ============================================================
+   BOOT
+   ============================================================ */
+(async function boot() {
+  Loader.show(() => "Loading");
+  loadSketchfabApi();          // fetched in the background; only the interior needs it
+  const loaded = new Promise(res => els.vHouse.addEventListener("load", res, { once: true }));
+  applyHouseSize();
+  els.vHouse.src = CABLES_URL;
+  await Promise.race([loaded, sleep(25000)]);
+  await sleep(CABLES_SETTLE);
+  showTitle();
+})();
+
+})();
+</script>
+</body>
+</html>
